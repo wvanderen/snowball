@@ -222,6 +222,12 @@ describe("core game calculations", () => {
 
     expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.25);
     expect(connectedSphereBuffMultiplier(state, first.id)).toBe(1);
+
+    const connection = connectionForSphere(state, first.id)!;
+    reverseConnection(state, connection.id);
+
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1);
+    expect(connectedSphereBuffMultiplier(state, first.id)).toBe(1);
   });
 
   it("purchases sphere levels with spendable energy and increasing costs", () => {

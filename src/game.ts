@@ -38,8 +38,8 @@ export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string)
   const hasActiveRoute = state.connections.some(
     (connection) =>
       connection.active &&
-      ((connection.fromSphereId === activeSphereId && connection.toSphereId === sphereId) ||
-        (connection.fromSphereId === sphereId && connection.toSphereId === activeSphereId)),
+      connection.fromSphereId === activeSphereId &&
+      connection.toSphereId === sphereId,
   );
   return hasActiveRoute ? 1.25 : 1;
 };

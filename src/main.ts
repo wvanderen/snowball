@@ -63,12 +63,21 @@ const sphereProgress = (sphere: Sphere) => {
 const spherePosition = (index: number, total: number) => {
   if (total === 1) return { x: 50, y: 76 };
 
-  const angle = (90 + (index * 360) / total) * (Math.PI / 180);
-  const radius = total <= 4 ? 32 : 35;
+  const angle = (-90 + (index * 360) / total) * (Math.PI / 180);
+  const radius = total <= 4 ? 31 : total <= 7 ? 34 : 37;
+  const verticalSquash = total >= 8 ? 0.88 : 0.94;
+
   return {
     x: 50 + Math.cos(angle) * radius,
-    y: 50 + Math.sin(angle) * radius,
+    y: 50 + Math.sin(angle) * radius * verticalSquash,
   };
+};
+
+const sphereVisualState = (sphere: Sphere) => {
+  const progress = sphereProgress(sphere);
+  if (sphere.milestoneCompletedDate === sphere.dailyProgressDate) return "is-complete";
+  if (progress < 25 && sphere.momentum < 35) return "needs-attention";
+  return "in-progress";
 };
 
 const renderEditSphereForm = (sphere: Sphere) => `
@@ -195,12 +204,17 @@ const renderSphere = (sphere: Sphere, index: number, spheres: Sphere[]) => {
   const completion = lastCompletion?.sphereId === sphere.id ? lastCompletion : null;
   const position = spherePosition(index, spheres.length);
 
+  const visualState = sphereVisualState(sphere);
+  const momentum = Math.round(sphere.momentum);
+
   return `
-    <button class="sphere domain-sphere ${isActive ? "is-active" : ""} ${completion ? "just-completed" : ""} ${completion?.completedMilestone ? "just-bloomed" : ""}" data-action="start-session" data-sphere-id="${sphere.id}" aria-label="${sphere.name}: ${Math.round(progress)}% of daily milestone${completion?.completedMilestone ? ", milestone bloom completed" : ""}" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --sphere-x: ${position.x}%; --sphere-y: ${position.y}%">
+    <button class="sphere domain-sphere ${visualState} ${isActive ? "is-active" : ""} ${completion ? "just-completed" : ""} ${completion?.completedMilestone ? "just-bloomed" : ""}" data-action="start-session" data-sphere-id="${sphere.id}" aria-label="${sphere.name}: ${Math.round(progress)}% of daily milestone, ${momentum}% momentum${completion?.completedMilestone ? ", milestone bloom completed" : ""}" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --momentum: ${momentum}; --sphere-x: ${position.x}%; --sphere-y: ${position.y}%">
+      <span class="attention-orbit"></span>
       <span class="progress-ring"></span>
       <span class="sphere-core">
         <span class="sphere-name">${sphere.name}</span>
         <span class="sphere-meta">${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</span>
+        <span class="momentum-chip">${momentum}% flow</span>
         ${completion?.completedMilestone ? `<span class="bloom-badge">Bloom</span>` : ""}
       </span>
       <span class="ritual-pill">${ritual?.name ?? "Focus"}</span>
@@ -212,7 +226,14 @@ const renderConnectionLines = (spheres: Sphere[]) =>
     .map((sphere, index) => {
       const position = spherePosition(index, spheres.length);
       const isActive = state.activeSession?.sphereId === sphere.id;
-      return `<line class="lattice-line ${isActive ? "is-flowing" : ""}" x1="50" y1="50" x2="${position.x}" y2="${position.y}" />`;
+      const completed = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
+      const progress = sphereProgress(sphere);
+      return `<g class="lattice-connection ${isActive ? "is-flowing" : ""} ${completed ? "is-complete" : ""}" style="--sphere-color: ${sphere.color}; --momentum: ${Math.round(sphere.momentum)}; --progress: ${Math.round(progress)}%">
+        <line class="lattice-line" x1="50" y1="50" x2="${position.x}" y2="${position.y}" />
+        <circle class="flow-particle" r="0.85" cx="50" cy="50">
+          <animateMotion dur="${Math.max(1.4, 3.4 - sphere.momentum / 45).toFixed(1)}s" repeatCount="indefinite" path="M 0 0 L ${position.x - 50} ${position.y - 50}" />
+        </circle>
+      </g>`;
     })
     .join("");
 

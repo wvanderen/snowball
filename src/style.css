@@ -143,9 +143,15 @@ input:focus-visible {
 .lattice-card::before {
   content: "";
   position: absolute;
-  inset: 12%;
+  inset: 9%;
   border: 1px solid rgba(167, 139, 250, 0.12);
   border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(167, 139, 250, 0.08) 0 1px, transparent 1px 100%),
+    radial-gradient(circle, transparent 57%, rgba(125, 211, 252, 0.06) 58%, transparent 59%);
+  background-size:
+    22px 22px,
+    100% 100%;
 }
 
 .lattice {
@@ -161,26 +167,52 @@ input:focus-visible {
   overflow: visible;
 }
 
+.lattice-connection {
+  --momentum-alpha: max(0.24, calc(var(--momentum) / 100));
+}
+
 .lattice-line {
-  stroke: rgba(125, 211, 252, 0.48);
-  stroke-width: 0.42;
+  stroke: color-mix(in srgb, var(--sphere-color), transparent calc(78% - var(--momentum) * 0.28%));
+  stroke-width: calc(0.26px + var(--momentum) * 0.006px);
   stroke-linecap: round;
-  filter: drop-shadow(0 0 7px rgba(125, 211, 252, 0.44));
+  stroke-dasharray: 1.2 2.4;
+  filter: drop-shadow(
+    0 0 calc(4px + var(--momentum) * 0.13px)
+      color-mix(in srgb, var(--sphere-color), transparent 42%)
+  );
+  opacity: var(--momentum-alpha);
   vector-effect: non-scaling-stroke;
 }
 
-.lattice-line.is-flowing {
-  stroke: rgba(125, 211, 252, 0.9);
+.lattice-connection.is-flowing .lattice-line {
+  stroke: color-mix(in srgb, var(--sphere-color), white 25%);
+  stroke-dasharray: 2.5 1.4;
   animation: flow-pulse 1.2s ease-in-out infinite;
+}
+
+.lattice-connection.is-complete .lattice-line {
+  stroke-dasharray: none;
+  opacity: 0.82;
+}
+
+.flow-particle {
+  fill: color-mix(in srgb, var(--sphere-color), white 28%);
+  filter: drop-shadow(0 0 8px var(--sphere-color));
+  opacity: calc(0.2 + var(--momentum-alpha) * 0.75);
+}
+
+.lattice-connection:not(.is-flowing, .is-complete) .flow-particle {
+  opacity: 0.22;
 }
 
 .sphere {
   --sphere-color: var(--accent);
+  --momentum: 50;
   position: absolute;
   display: grid;
   place-items: center;
-  width: 154px;
-  height: 154px;
+  width: clamp(112px, 22vw, 154px);
+  height: clamp(112px, 22vw, 154px);
   padding: 0;
   border-radius: 50%;
   color: var(--white);
@@ -202,7 +234,8 @@ input:focus-visible {
       color-mix(in srgb, var(--sphere-color), black 58%) 66%
     );
   box-shadow:
-    0 0 32px color-mix(in srgb, var(--sphere-color), transparent 50%),
+    0 0 calc(16px + var(--momentum) * 0.42px)
+      color-mix(in srgb, var(--sphere-color), transparent calc(74% - var(--momentum) * 0.42%)),
     inset 0 -16px 28px rgba(0, 0, 0, 0.38);
 }
 
@@ -221,6 +254,29 @@ input:focus-visible {
 
 .domain-sphere.is-active::before {
   animation: active-pulse 1.2s ease-in-out infinite;
+}
+
+.domain-sphere.is-complete::before {
+  filter: saturate(1.2) brightness(1.1);
+}
+
+.domain-sphere.needs-attention::before {
+  filter: grayscale(0.35) brightness(0.78);
+  box-shadow:
+    0 0 18px color-mix(in srgb, var(--sphere-color), transparent 72%),
+    inset 0 -16px 28px rgba(0, 0, 0, 0.52);
+}
+
+.attention-orbit {
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.domain-sphere.needs-attention .attention-orbit {
+  border: 1px dashed rgba(248, 113, 113, 0.58);
+  animation: orbit-warn 5s linear infinite;
 }
 
 .domain-sphere.just-completed::before {
@@ -251,8 +307,21 @@ input:focus-visible {
   inset: 0;
   border-radius: 50%;
   background: conic-gradient(var(--sphere-color) var(--progress), rgba(255, 255, 255, 0.1) 0);
-  mask: radial-gradient(circle, transparent 67px, #000 68px);
+  mask: radial-gradient(circle, transparent calc(50% - 10px), #000 calc(50% - 9px));
   opacity: 0.92;
+}
+
+.domain-sphere.is-complete .progress-ring {
+  background: conic-gradient(
+    color-mix(in srgb, var(--sphere-color), white 28%) 100%,
+    transparent 0
+  );
+  opacity: 1;
+}
+
+.domain-sphere.needs-attention .progress-ring {
+  background: conic-gradient(#f87171 max(var(--progress), 4%), rgba(255, 255, 255, 0.08) 0);
+  opacity: 0.72;
 }
 
 .sphere-core {
@@ -277,6 +346,13 @@ input:focus-visible {
 
 .sphere-meta {
   font-size: 0.75rem;
+}
+
+.momentum-chip {
+  margin-top: 3px;
+  color: color-mix(in srgb, var(--sphere-color), white 34%);
+  font-size: 0.62rem;
+  font-weight: 900;
 }
 
 .bloom-badge {
@@ -684,14 +760,25 @@ input:focus-visible {
 }
 
 @keyframes flow-pulse {
-  0%,
-  100% {
+  0% {
     opacity: 0.45;
     filter: brightness(0.85);
+    stroke-dashoffset: 0;
   }
   50% {
     opacity: 1;
     filter: brightness(1.35);
+  }
+  100% {
+    opacity: 0.45;
+    filter: brightness(0.85);
+    stroke-dashoffset: -8;
+  }
+}
+
+@keyframes orbit-warn {
+  to {
+    transform: rotate(360deg);
   }
 }
 
@@ -708,11 +795,11 @@ input:focus-visible {
 
   .lattice-card,
   .lattice {
-    min-height: 560px;
+    min-height: 620px;
   }
 
   .lattice {
-    height: 560px;
+    height: 620px;
   }
 
   .sphere-list {

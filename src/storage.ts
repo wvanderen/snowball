@@ -7,6 +7,7 @@ export type BackupFile = {
 };
 
 const storageKey = "snowball:v0:state";
+const supportedStateVersion = 1;
 
 const nowIso = () => new Date().toISOString();
 
@@ -71,6 +72,9 @@ export const parseBackupState = (raw: string): AppState => {
   const parsed = JSON.parse(raw) as unknown;
   const candidate = isRecord(parsed) && parsed.app === "snowball" ? parsed.state : parsed;
   if (!isRecord(candidate)) throw new Error("Backup does not contain Snowball state.");
+  if (candidate.version !== supportedStateVersion) {
+    throw new Error("Backup version is not supported.");
+  }
 
   if (
     !Array.isArray(candidate.spheres) ||

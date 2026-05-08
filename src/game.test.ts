@@ -219,8 +219,23 @@ describe("core game calculations", () => {
 
   it("rejects invalid backup files", () => {
     expect(() =>
-      parseBackupState(JSON.stringify({ app: "snowball", state: { game: {} } })),
+      parseBackupState(JSON.stringify({ app: "snowball", state: { version: 1, game: {} } })),
     ).toThrow("Backup is missing required local data arrays.");
+  });
+
+  it("rejects backups with missing or unsupported state versions", () => {
+    const state = createInitialState();
+    const backup = JSON.parse(createBackupJson(state)) as { state: { version?: number } };
+
+    delete backup.state.version;
+    expect(() => parseBackupState(JSON.stringify(backup))).toThrow(
+      "Backup version is not supported.",
+    );
+
+    backup.state.version = 999;
+    expect(() => parseBackupState(JSON.stringify(backup))).toThrow(
+      "Backup version is not supported.",
+    );
   });
 
   it("rolls completed days forward without penalizing momentum", () => {

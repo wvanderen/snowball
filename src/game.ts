@@ -35,18 +35,21 @@ export const equipGlyph = (state: AppState, glyphId: string, sphereId: string) =
   const previousSphere = glyph.equippedSphereId
     ? state.spheres.find((item) => item.id === glyph.equippedSphereId)
     : null;
-  if (previousSphere) {
+
+  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
+  const isAlreadyEquippedHere = sphere.equippedGlyphIds.includes(glyph.id);
+  if (!isAlreadyEquippedHere && sphere.equippedGlyphIds.length >= sphere.glyphSlotCount) {
+    return false;
+  }
+
+  if (previousSphere && previousSphere.id !== sphere.id) {
     previousSphere.equippedGlyphIds = previousSphere.equippedGlyphIds.filter(
       (id) => id !== glyph.id,
     );
     previousSphere.updatedAt = now;
   }
 
-  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
-  if (!sphere.equippedGlyphIds.includes(glyph.id)) {
-    if (sphere.equippedGlyphIds.length >= sphere.glyphSlotCount) return false;
-    sphere.equippedGlyphIds.push(glyph.id);
-  }
+  if (!isAlreadyEquippedHere) sphere.equippedGlyphIds.push(glyph.id);
   glyph.equippedSphereId = sphere.id;
   glyph.updatedAt = now;
   sphere.updatedAt = now;

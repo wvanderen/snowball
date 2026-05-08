@@ -273,6 +273,23 @@ describe("core game calculations", () => {
     vi.useRealTimers();
   });
 
+  it("keeps glyph state intact when moving to a full sphere fails", () => {
+    const state = createInitialState();
+    state.game.energy = 100;
+    const source = createDomainSphere(state, "Study", "#38bdf8", 20)!;
+    const target = createDomainSphere(state, "Move", "#f97316", 20)!;
+
+    expect(equipGlyph(state, "glyph_streak", source.id)).toBe(true);
+    expect(equipGlyph(state, "glyph_deep_work", target.id)).toBe(true);
+    expect(equipGlyph(state, "glyph_streak", target.id)).toBe(false);
+
+    expect(state.glyphs.find((glyph) => glyph.id === "glyph_streak")?.equippedSphereId).toBe(
+      source.id,
+    );
+    expect(source.equippedGlyphIds).toEqual(["glyph_streak"]);
+    expect(target.equippedGlyphIds).toEqual(["glyph_deep_work"]);
+  });
+
   it("purchases sphere levels with spendable energy and increasing costs", () => {
     const state = createInitialState();
     createDomainSphere(state, "Study", "#38bdf8", 20);

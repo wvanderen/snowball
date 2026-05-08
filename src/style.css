@@ -73,6 +73,7 @@ input:focus-visible {
 
 .top-bar,
 .sphere-stat-card,
+.history-card,
 .intro-card,
 .lattice-card,
 .session-sheet {
@@ -305,6 +306,80 @@ input:focus-visible {
 .tap-hint {
   margin: 14px 6px 0;
   text-align: center;
+}
+
+.history-card {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 24px;
+}
+
+.section-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: start;
+}
+
+.section-heading h2 {
+  margin: 0;
+  color: var(--white);
+  font-size: 1.15rem;
+}
+
+.section-heading span,
+.empty-history,
+.history-item p,
+.history-item time {
+  color: var(--muted);
+}
+
+.section-heading span {
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.history-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.history-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.history-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--sphere-color);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--sphere-color), transparent 32%);
+}
+
+.history-item strong {
+  color: var(--white);
+}
+
+.history-item p {
+  margin: 2px 0 0;
+  font-size: 0.86rem;
+}
+
+.history-item time {
+  font-size: 0.76rem;
+  text-align: right;
+}
+
+.empty-history {
+  margin: 12px 0 0;
 }
 
 .session-sheet {

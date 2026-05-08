@@ -1,5 +1,5 @@
 import "./style.css";
-import { type AppState, type Sphere } from "./domain.ts";
+import { type AppState, type Session, type Sphere } from "./domain.ts";
 import {
   applyPassiveProduction,
   createDomainSphere,
@@ -22,6 +22,13 @@ let isCreatingSphere = false;
 let creatingRitualForSphereId: string | null = null;
 
 const round = (value: number) => Math.floor(value).toLocaleString();
+const formatSessionTime = (iso: string) =>
+  new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(iso));
 const activeElapsedSeconds = () =>
   state.activeSession
     ? Math.floor((Date.now() - new Date(state.activeSession.startedAt).getTime()) / 1000)
@@ -166,6 +173,7 @@ const renderHome = () => {
         ${spheres.map(renderSphereStats).join("")}
       </section>
       <p class="tap-hint">Tap any sphere to start immediately. Partial sessions count; milestone blooms trigger when the full daily target is reached.</p>
+      ${renderSessionHistory()}
 
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
       ${renderRitualModal()}
@@ -221,6 +229,41 @@ const renderRitualModal = () => {
 
   const sphere = state.spheres.find((item) => item.id === creatingRitualForSphereId);
   return sphere ? `<div class="modal-scrim">${renderRitualForm(sphere)}</div>` : "";
+};
+
+const renderSessionHistoryItem = (session: Session) => {
+  const sphere = state.spheres.find((item) => item.id === session.sphereId);
+  const ritual = getRitual(state, session.ritualId);
+
+  return `
+    <li class="history-item" style="--sphere-color: ${sphere?.color ?? "#7dd3fc"}">
+      <span class="history-dot"></span>
+      <div>
+        <strong>${sphere?.name ?? "Unknown sphere"}</strong>
+        <p>${ritual?.name ?? "Focus"} · ${formatDuration(session.durationSeconds)}${session.completedMilestoneAfterSession ? " · bloom" : ""}</p>
+      </div>
+      <time>${formatSessionTime(session.startedAt)}</time>
+    </li>`;
+};
+
+const renderSessionHistory = () => {
+  const recentSessions = state.sessions.slice(0, 5);
+
+  return `
+    <section class="history-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Recent</p>
+          <h2>Session history</h2>
+        </div>
+        <span>${state.sessions.length} total</span>
+      </div>
+      ${
+        recentSessions.length > 0
+          ? `<ol class="history-list">${recentSessions.map(renderSessionHistoryItem).join("")}</ol>`
+          : `<p class="empty-history">Your logged sessions will appear here.</p>`
+      }
+    </section>`;
 };
 
 const renderSessionOverlay = () => {

@@ -10,6 +10,8 @@ import {
   createRitual,
   domainSpheres,
   ensureToday,
+  equipGlyph,
+  equippedGlyphsForSphere,
   finishActiveSession,
   formatDuration,
   formatMinutes,
@@ -25,6 +27,7 @@ import {
   purchaseSphereLevel,
   toggleConnection,
   startSession,
+  unequipGlyph,
   updateDomainSphere,
   updateRitual,
 } from "./game.ts";
@@ -369,6 +372,8 @@ const renderSphereStats = (sphere: Sphere) => {
   const rates = routedSphereRates(state, sphere);
   const canAffordLevel = state.game.energy >= levelCost;
   const connection = connectionForSphere(state, sphere.id);
+  const equippedGlyphs = equippedGlyphsForSphere(state, sphere.id);
+  const availableGlyphs = state.glyphs.filter((glyph) => !glyph.equippedSphereId);
   const routeOptions = [
     { id: "center", name: "Center" },
     ...domainSpheres(state)
@@ -414,6 +419,19 @@ const renderSphereStats = (sphere: Sphere) => {
       </div>`
           : ""
       }
+      <div class="glyph-row">
+        <span>Glyphs ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span>
+        ${equippedGlyphs
+          .map(
+            (glyph) =>
+              `<button class="tiny-action glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`,
+          )
+          .join("")}
+        <select class="route-select" data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}>
+          <option value="">Equip glyph</option>
+          ${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}
+        </select>
+      </div>
       ${renderRitualHotbar(sphere)}
       ${renderActiveRitualHistory(sphere)}
     </article>`;
@@ -532,6 +550,17 @@ const render = () => {
   if (domainSpheres(state).length === 0) renderOnboarding();
   else renderHome();
 };
+
+app.addEventListener("change", (event) => {
+  const target = event.target as HTMLElement;
+  if (!(target instanceof HTMLSelectElement) || target.dataset.action !== "equip-glyph") return;
+
+  const sphereId = target.dataset.sphereId;
+  const glyphId = target.value;
+  if (sphereId && glyphId && equipGlyph(state, glyphId, sphereId)) lastReward = "Glyph equipped";
+  persistState();
+  render();
+});
 
 app.addEventListener("submit", (event) => {
   const form = event.target;
@@ -699,6 +728,14 @@ app.addEventListener("click", async (event) => {
       persistState();
       render();
     }
+  }
+
+  if (action === "unequip-glyph") {
+    const glyphId = actionElement.dataset.glyphId;
+    if (glyphId && unequipGlyph(state, glyphId)) lastReward = "Glyph unequipped";
+    persistState();
+    render();
+    return;
   }
 
   if (action === "level-sphere") {

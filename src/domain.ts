@@ -1,5 +1,23 @@
 export type SphereKind = "center" | "domain";
 
+export type GlyphEffect =
+  | "streak"
+  | "recent-consistency"
+  | "deep-work"
+  | "recovery"
+  | "persistence"
+  | "resonance";
+
+export type Glyph = {
+  id: string;
+  name: string;
+  effect: GlyphEffect;
+  description: string;
+  equippedSphereId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type Sphere = {
   id: string;
   kind: SphereKind;
@@ -8,6 +26,8 @@ export type Sphere = {
   dailyTargetMinutes: number;
   activeRitualId: string | null;
   ritualIds: string[];
+  glyphSlotCount: number;
+  equippedGlyphIds: string[];
   level: number;
   momentum: number;
   currentStreak: number;
@@ -76,6 +96,7 @@ export type AppState = {
   rituals: Ritual[];
   sessions: Session[];
   connections: Connection[];
+  glyphs: Glyph[];
   game: GameState;
   activeSession: ActiveSession | null;
 };

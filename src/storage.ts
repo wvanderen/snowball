@@ -3,6 +3,7 @@ import {
   type AppState,
   type Connection,
   type GameState,
+  type Glyph,
   type Ritual,
   type Session,
   type Sphere,
@@ -17,7 +18,7 @@ export type BackupFile = {
 
 const legacyStorageKey = "snowball:v0:state";
 const dbName = "snowball";
-const dbVersion = 2;
+const dbVersion = 3;
 const supportedStateVersion = 1;
 
 const stores = {
@@ -26,6 +27,7 @@ const stores = {
   rituals: "rituals",
   sessions: "sessions",
   connections: "connections",
+  glyphs: "glyphs",
 } as const;
 
 const metadataKeys = {
@@ -76,6 +78,8 @@ export const createInitialState = (): AppState => {
         dailyTargetMinutes: 0,
         activeRitualId: null,
         ritualIds: [],
+        glyphSlotCount: 0,
+        equippedGlyphIds: [],
         level: 1,
         momentum: 50,
         currentStreak: 0,
@@ -94,6 +98,7 @@ export const createInitialState = (): AppState => {
     rituals: [],
     sessions: [],
     connections: [],
+    glyphs: createStarterGlyphs(now),
     game: {
       energy: 0,
       lifetimeEnergy: 0,
@@ -104,6 +109,63 @@ export const createInitialState = (): AppState => {
     activeSession: null,
   };
 };
+
+const createStarterGlyphs = (now: string): Glyph[] => [
+  {
+    id: "glyph_streak",
+    name: "Streak Lens",
+    effect: "streak",
+    description: "Active energy scales with this sphere's streak.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_recent_consistency",
+    name: "Consistency Prism",
+    effect: "recent-consistency",
+    description: "Milestone completion today improves passive production.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_deep_work",
+    name: "Deep Work Rune",
+    effect: "deep-work",
+    description: "Long sessions earn extra active energy.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_recovery",
+    name: "Recovery Knot",
+    effect: "recovery",
+    description: "Missed days decay momentum more gently.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_persistence",
+    name: "Persistence Mark",
+    effect: "persistence",
+    description: "Every logged session adds extra momentum.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_resonance",
+    name: "Resonance Sigil",
+    effect: "resonance",
+    description: "Outgoing routes carry a stronger active-session buff.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -124,9 +186,14 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
 
   const restored = { ...createInitialState(), ...candidate } as AppState;
   restored.connections = Array.isArray(candidate.connections) ? restored.connections : [];
+  restored.glyphs = Array.isArray(candidate.glyphs)
+    ? restored.glyphs
+    : createStarterGlyphs(nowIso());
   restored.activeSession = isRecord(candidate.activeSession) ? restored.activeSession : null;
   restored.spheres = restored.spheres.map((sphere) => ({
     ...sphere,
+    glyphSlotCount: sphere.glyphSlotCount ?? (sphere.kind === "domain" ? 1 : 0),
+    equippedGlyphIds: sphere.equippedGlyphIds ?? [],
     archivedAt: sphere.archivedAt ?? null,
   }));
   restored.rituals = restored.rituals.map((ritual) => ({
@@ -172,6 +239,7 @@ const openDatabase = () =>
       ensureEntityStore(database, stores.rituals);
       ensureEntityStore(database, stores.sessions);
       ensureEntityStore(database, stores.connections);
+      ensureEntityStore(database, stores.glyphs);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -205,7 +273,8 @@ const writeEntityState = (database: IDBDatabase, state: AppState) =>
     const rituals = transaction.objectStore(stores.rituals);
     const sessions = transaction.objectStore(stores.sessions);
     const connections = transaction.objectStore(stores.connections);
-    const storesToClear = [metadata, spheres, rituals, sessions, connections];
+    const glyphs = transaction.objectStore(stores.glyphs);
+    const storesToClear = [metadata, spheres, rituals, sessions, connections, glyphs];
     let clearedCount = 0;
 
     const writeRecords = () => {
@@ -219,6 +288,7 @@ const writeEntityState = (database: IDBDatabase, state: AppState) =>
       state.rituals.forEach((ritual) => rituals.put(ritual));
       state.sessions.forEach((session) => sessions.put(session));
       state.connections.forEach((connection) => connections.put(connection));
+      state.glyphs.forEach((glyph) => glyphs.put(glyph));
     };
 
     storesToClear.forEach((store) => {
@@ -241,6 +311,7 @@ const readEntityState = async (database: IDBDatabase): Promise<AppState | null> 
     rituals: await getAll<Ritual>(database, stores.rituals),
     sessions: await getAll<Session>(database, stores.sessions),
     connections: await getAll<Connection>(database, stores.connections),
+    glyphs: await getAll<Glyph>(database, stores.glyphs),
     game: await readMetadataValue<GameState>(database, metadataKeys.game),
     activeSession: await readMetadataValue<ActiveSession | null>(
       database,

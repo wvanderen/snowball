@@ -1,6 +1,7 @@
 import {
   type AppState,
   type Connection,
+  type GlyphEffect,
   type Ritual,
   type Session,
   type Sphere,
@@ -13,6 +14,58 @@ const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const maxPassiveElapsedSeconds = 8 * 60 * 60;
 
 export const sphereLevelCost = (sphere: Sphere) => Math.floor(50 * sphere.level ** 1.65);
+
+export const glyphSlotsForLevel = (level: number) =>
+  Math.min(3, 1 + Math.floor(Math.max(0, level - 1) / 3));
+
+export const equippedGlyphsForSphere = (state: AppState, sphereId: string) =>
+  state.glyphs.filter((glyph) => glyph.equippedSphereId === sphereId);
+
+export const hasGlyphEffect = (state: AppState, sphereId: string, effect: GlyphEffect) =>
+  equippedGlyphsForSphere(state, sphereId).some((glyph) => glyph.effect === effect);
+
+export const equipGlyph = (state: AppState, glyphId: string, sphereId: string) => {
+  const glyph = state.glyphs.find((item) => item.id === glyphId);
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!glyph || !sphere) return false;
+
+  const now = nowIso();
+  const previousSphere = glyph.equippedSphereId
+    ? state.spheres.find((item) => item.id === glyph.equippedSphereId)
+    : null;
+  if (previousSphere) {
+    previousSphere.equippedGlyphIds = previousSphere.equippedGlyphIds.filter(
+      (id) => id !== glyph.id,
+    );
+    previousSphere.updatedAt = now;
+  }
+
+  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
+  if (!sphere.equippedGlyphIds.includes(glyph.id)) {
+    if (sphere.equippedGlyphIds.length >= sphere.glyphSlotCount) return false;
+    sphere.equippedGlyphIds.push(glyph.id);
+  }
+  glyph.equippedSphereId = sphere.id;
+  glyph.updatedAt = now;
+  sphere.updatedAt = now;
+  return true;
+};
+
+export const unequipGlyph = (state: AppState, glyphId: string) => {
+  const glyph = state.glyphs.find((item) => item.id === glyphId);
+  if (!glyph?.equippedSphereId) return false;
+
+  const sphere = state.spheres.find((item) => item.id === glyph.equippedSphereId);
+  if (sphere) {
+    sphere.equippedGlyphIds = sphere.equippedGlyphIds.filter((id) => id !== glyph.id);
+    sphere.updatedAt = nowIso();
+  }
+  glyph.equippedSphereId = null;
+  glyph.updatedAt = nowIso();
+  return true;
+};
 
 export const sphereSlotCost = (state: AppState) => {
   const activeSphereCount = domainSpheres(state).length;
@@ -41,11 +94,29 @@ export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string)
       connection.fromSphereId === activeSphereId &&
       connection.toSphereId === sphereId,
   );
-  return hasActiveRoute ? 1.25 : 1;
+  if (!hasActiveRoute) return 1;
+  return hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25;
+};
+
+export const glyphRateMultiplier = (state: AppState, sphere: Sphere) => {
+  let multiplier = 1;
+  if (hasGlyphEffect(state, sphere.id, "streak")) {
+    multiplier += Math.min(0.15, sphere.currentStreak * 0.005);
+  }
+  if (
+    hasGlyphEffect(state, sphere.id, "recent-consistency") &&
+    sphere.milestoneCompletedDate === sphere.dailyProgressDate
+  ) {
+    multiplier += 0.1;
+  }
+  return multiplier;
 };
 
 export const routedSphereRates = (state: AppState, sphere: Sphere) =>
-  sphereRates(sphere, connectedSphereBuffMultiplier(state, sphere.id));
+  sphereRates(
+    sphere,
+    connectedSphereBuffMultiplier(state, sphere.id) * glyphRateMultiplier(state, sphere),
+  );
 
 export const momentumModel = {
   partialMissDecay: 3,
@@ -66,7 +137,7 @@ const daysBetweenLocalDateKeys = (from: string, to: string) => {
   return Math.max(0, Math.round((toTime - fromTime) / millisecondsPerDay));
 };
 
-const missedMomentumDecay = (sphere: Sphere, today: string) => {
+const missedMomentumDecay = (state: AppState, sphere: Sphere, today: string) => {
   if (sphere.kind !== "domain") return 0;
   const elapsedDays = daysBetweenLocalDateKeys(sphere.dailyProgressDate, today);
   if (elapsedDays <= 0 || sphere.milestoneCompletedDate === sphere.dailyProgressDate) return 0;
@@ -74,7 +145,8 @@ const missedMomentumDecay = (sphere: Sphere, today: string) => {
   const firstMissDecay =
     sphere.todaySeconds > 0 ? momentumModel.partialMissDecay : momentumModel.missedDayDecay;
   const gapDecay = Math.max(0, elapsedDays - 1) * momentumModel.missedDayDecay;
-  return Math.min(momentumModel.maxReturnGapDecay, firstMissDecay + gapDecay);
+  const baseDecay = Math.min(momentumModel.maxReturnGapDecay, firstMissDecay + gapDecay);
+  return hasGlyphEffect(state, sphere.id, "recovery") ? Math.floor(baseDecay * 0.7) : baseDecay;
 };
 
 export const domainSpheres = (state: AppState) =>
@@ -91,7 +163,7 @@ export const ensureToday = (state: AppState) => {
 
   for (const sphere of state.spheres) {
     if (sphere.dailyProgressDate !== today) {
-      const decay = missedMomentumDecay(sphere, today);
+      const decay = missedMomentumDecay(state, sphere, today);
       sphere.todaySeconds = 0;
       sphere.dailyProgressDate = today;
       sphere.momentum = clamp(sphere.momentum - decay, 0, 100);
@@ -154,6 +226,8 @@ export const createDomainSphere = (
     dailyTargetMinutes,
     activeRitualId: ritualId,
     ritualIds: [ritualId],
+    glyphSlotCount: 1,
+    equippedGlyphIds: [],
     level: 1,
     momentum: 35,
     currentStreak: 0,
@@ -281,6 +355,7 @@ export const purchaseSphereLevel = (state: AppState, sphereId: string) => {
 
   state.game.energy -= cost;
   sphere.level += 1;
+  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
   sphere.updatedAt = nowIso();
   return true;
 };
@@ -440,10 +515,17 @@ export const finishActiveSession = (state: AppState) => {
     minutes >= 5 ? momentumModel.focusedSessionBoost : momentumModel.shortSessionBoost;
   const milestoneMomentumBoost = completedMilestoneAfterSession ? momentumModel.milestoneBoost : 0;
   const momentumBefore = sphere.momentum;
-  sphere.momentum = clamp(sphere.momentum + momentumSessionBoost + milestoneMomentumBoost, 0, 100);
+  const glyphMomentumBoost = hasGlyphEffect(state, sphere.id, "persistence") ? 1 : 0;
+  sphere.momentum = clamp(
+    sphere.momentum + momentumSessionBoost + milestoneMomentumBoost + glyphMomentumBoost,
+    0,
+    100,
+  );
 
   const { activePerMinute } = routedSphereRates(state, sphere);
-  const activeEnergy = minutes * activePerMinute;
+  const deepWorkMultiplier =
+    hasGlyphEffect(state, sphere.id, "deep-work") && minutes >= 25 ? 1.2 : 1;
+  const activeEnergy = minutes * activePerMinute * deepWorkMultiplier;
   const milestoneEnergy = completedMilestoneAfterSession ? sphere.dailyTargetMinutes * 2 : 0;
   const energyGained = activeEnergy + milestoneEnergy;
 

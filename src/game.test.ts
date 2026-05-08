@@ -11,16 +11,20 @@ import {
   createRitual,
   domainSpheres,
   ensureToday,
+  equipGlyph,
+  equippedGlyphsForSphere,
   finishActiveSession,
   purchaseSphereLevel,
   recentSessionsForRitual,
   reverseConnection,
+  routedSphereRates,
   routeConnectionToSphere,
   setActiveRitual,
   sphereLevelCost,
   sphereSlotCost,
   startSession,
   toggleConnection,
+  unequipGlyph,
   updateDomainSphere,
   updateRitual,
 } from "./game.ts";
@@ -228,6 +232,45 @@ describe("core game calculations", () => {
 
     expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1);
     expect(connectedSphereBuffMultiplier(state, first.id)).toBe(1);
+  });
+
+  it("equips glyphs into sphere slots and applies v1 consistency effects", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    const sphere = createDomainSphere(state, "Study", "#38bdf8", 20)!;
+
+    expect(sphere.glyphSlotCount).toBe(1);
+    expect(equipGlyph(state, "glyph_streak", sphere.id)).toBe(true);
+    expect(equippedGlyphsForSphere(state, sphere.id).map((glyph) => glyph.effect)).toEqual([
+      "streak",
+    ]);
+    expect(equipGlyph(state, "glyph_deep_work", sphere.id)).toBe(false);
+
+    sphere.currentStreak = 10;
+    const baseActive = routedSphereRates(state, sphere).activePerMinute;
+    expect(baseActive).toBeCloseTo(8.505);
+
+    state.game.energy = 500;
+    sphere.level = 3;
+    expect(purchaseSphereLevel(state, sphere.id)).toBe(true);
+    expect(sphere.glyphSlotCount).toBe(2);
+    expect(equipGlyph(state, "glyph_deep_work", sphere.id)).toBe(true);
+    expect(unequipGlyph(state, "glyph_streak")).toBe(true);
+    expect(equippedGlyphsForSphere(state, sphere.id).map((glyph) => glyph.effect)).toEqual([
+      "deep-work",
+    ]);
+
+    state.activeSession = {
+      id: "session_deep",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-08T11:30:00.000Z",
+    };
+    const result = finishActiveSession(state)!;
+    expect(result.activeEnergy).toBeCloseTo(1339.2);
+
+    vi.useRealTimers();
   });
 
   it("purchases sphere levels with spendable energy and increasing costs", () => {

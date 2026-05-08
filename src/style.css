@@ -257,9 +257,7 @@ input:focus-visible {
 
 .sphere-stat-card {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
-  gap: 10px;
-  align-items: center;
+  gap: 12px;
   padding: 14px 16px;
   border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 68%);
   border-radius: 22px;
@@ -268,6 +266,40 @@ input:focus-visible {
     color-mix(in srgb, var(--sphere-color), transparent 88%),
     rgba(255, 255, 255, 0.04)
   );
+}
+
+.sphere-stat-grid {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.ritual-hotbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.ritual-chip {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 0.78rem;
+}
+
+.ritual-chip.is-selected {
+  color: #06111d;
+  background: color-mix(in srgb, var(--sphere-color), white 20%);
+}
+
+.add-chip {
+  color: var(--muted);
+  background: transparent;
 }
 
 .tap-hint {
@@ -358,6 +390,10 @@ input:focus-visible {
   font-size: clamp(2.2rem, 10vw, 4.5rem);
   line-height: 0.92;
   letter-spacing: -0.08em;
+}
+
+.compact-card h1 {
+  font-size: clamp(2rem, 9vw, 3.5rem);
 }
 
 .sphere-form {

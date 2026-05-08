@@ -3,12 +3,14 @@ import { type AppState, type Sphere } from "./domain.ts";
 import {
   applyPassiveProduction,
   createDomainSphere,
+  createRitual,
   domainSpheres,
   ensureToday,
   finishActiveSession,
   formatDuration,
   formatMinutes,
   getRitual,
+  setActiveRitual,
   startSession,
 } from "./game.ts";
 import { loadState, resetState, saveState } from "./storage.ts";
@@ -17,6 +19,7 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 let state: AppState = loadState();
 let lastReward: string | null = null;
 let isCreatingSphere = false;
+let creatingRitualForSphereId: string | null = null;
 
 const round = (value: number) => Math.floor(value).toLocaleString();
 const activeElapsedSeconds = () =>
@@ -39,6 +42,30 @@ const spherePosition = (index: number, total: number) => {
     y: 50 + Math.sin(angle) * radius,
   };
 };
+
+const renderRitualForm = (sphere: Sphere) => `
+  <section class="intro-card compact-card">
+    <p class="eyebrow">${sphere.name}</p>
+    <h1>Add ritual.</h1>
+    <p class="lede">Rituals are favorite activities inside this sphere. New rituals become active immediately.</p>
+    <form id="create-ritual-form" class="sphere-form" data-sphere-id="${sphere.id}">
+      <label>
+        Ritual name
+        <input name="name" autocomplete="off" placeholder="Guitar practice" required maxlength="36" />
+      </label>
+      <label>
+        Optional target
+        <div class="inline-input">
+          <input name="target" type="number" min="1" max="240" placeholder="Count up" />
+          <span>minutes</span>
+        </div>
+      </label>
+      <div class="form-actions">
+        <button type="button" class="ghost" data-action="cancel-create-ritual">Cancel</button>
+        <button type="submit">Add ritual</button>
+      </div>
+    </form>
+  </section>`;
 
 const renderSphereForm = (isFirstRun: boolean) => `
   <section class="intro-card">
@@ -141,9 +168,29 @@ const renderHome = () => {
       <p class="tap-hint">Tap any sphere to start immediately. Partial sessions count; milestone blooms trigger when the full daily target is reached.</p>
 
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
+      ${renderRitualModal()}
       ${state.activeSession ? renderSessionOverlay() : ""}
       ${lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
     </main>`;
+};
+
+const renderRitualHotbar = (sphere: Sphere) => {
+  const rituals = state.rituals.filter(
+    (ritual) => ritual.sphereId === sphere.id && ritual.isFavorite,
+  );
+
+  return `
+    <div class="ritual-hotbar" aria-label="${sphere.name} rituals">
+      ${rituals
+        .map(
+          (ritual) => `
+            <button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">
+              ${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}
+            </button>`,
+        )
+        .join("")}
+      <button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Ritual</button>
+    </div>`;
 };
 
 const renderSphereStats = (sphere: Sphere) => {
@@ -151,19 +198,29 @@ const renderSphereStats = (sphere: Sphere) => {
 
   return `
     <article class="sphere-stat-card" style="--sphere-color: ${sphere.color}">
-      <div>
-        <p class="eyebrow">${sphere.name}</p>
-        <strong>${milestoneDone ? "Bloomed" : `${Math.round(sphereProgress(sphere))}%`}</strong>
+      <div class="sphere-stat-grid">
+        <div>
+          <p class="eyebrow">${sphere.name}</p>
+          <strong>${milestoneDone ? "Bloomed" : `${Math.round(sphereProgress(sphere))}%`}</strong>
+        </div>
+        <div>
+          <p class="eyebrow">Momentum</p>
+          <strong>${Math.round(sphere.momentum)}%</strong>
+        </div>
+        <div>
+          <p class="eyebrow">Today</p>
+          <strong>${formatMinutes(sphere.todaySeconds)}m</strong>
+        </div>
       </div>
-      <div>
-        <p class="eyebrow">Momentum</p>
-        <strong>${Math.round(sphere.momentum)}%</strong>
-      </div>
-      <div>
-        <p class="eyebrow">Today</p>
-        <strong>${formatMinutes(sphere.todaySeconds)}m</strong>
-      </div>
+      ${renderRitualHotbar(sphere)}
     </article>`;
+};
+
+const renderRitualModal = () => {
+  if (!creatingRitualForSphereId) return "";
+
+  const sphere = state.spheres.find((item) => item.id === creatingRitualForSphereId);
+  return sphere ? `<div class="modal-scrim">${renderRitualForm(sphere)}</div>` : "";
 };
 
 const renderSessionOverlay = () => {
@@ -198,19 +255,28 @@ const render = () => {
 
 app.addEventListener("submit", (event) => {
   const form = event.target;
-  if (!(form instanceof HTMLFormElement) || form.id !== "create-sphere-form") return;
+  if (!(form instanceof HTMLFormElement)) return;
 
   event.preventDefault();
   const data = new FormData(form);
   const rawName = data.get("name");
-  const rawColor = data.get("color");
   const rawTarget = data.get("target");
   const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : "Focus";
-  const color = typeof rawColor === "string" ? rawColor : "#7dd3fc";
-  const target = typeof rawTarget === "string" ? Number(rawTarget) : 20;
+  const target = typeof rawTarget === "string" && rawTarget ? Number(rawTarget) : null;
 
-  createDomainSphere(state, name, color, target);
-  isCreatingSphere = false;
+  if (form.id === "create-sphere-form") {
+    const rawColor = data.get("color");
+    const color = typeof rawColor === "string" ? rawColor : "#7dd3fc";
+    createDomainSphere(state, name, color, target ?? 20);
+    isCreatingSphere = false;
+  }
+
+  if (form.id === "create-ritual-form") {
+    const sphereId = form.dataset.sphereId;
+    if (sphereId) createRitual(state, sphereId, name, target);
+    creatingRitualForSphereId = null;
+  }
+
   saveState(state);
   render();
 });
@@ -231,6 +297,24 @@ app.addEventListener("click", (event) => {
 
   if (action === "cancel-create-sphere") {
     isCreatingSphere = false;
+    render();
+  }
+
+  if (action === "show-create-ritual") {
+    creatingRitualForSphereId = actionElement.dataset.sphereId ?? null;
+    render();
+  }
+
+  if (action === "cancel-create-ritual") {
+    creatingRitualForSphereId = null;
+    render();
+  }
+
+  if (action === "set-active-ritual") {
+    const sphereId = actionElement.dataset.sphereId;
+    const ritualId = actionElement.dataset.ritualId;
+    if (sphereId && ritualId) setActiveRitual(state, sphereId, ritualId);
+    saveState(state);
     render();
   }
 
@@ -259,6 +343,7 @@ app.addEventListener("click", (event) => {
     state = loadState();
     lastReward = null;
     isCreatingSphere = false;
+    creatingRitualForSphereId = null;
     render();
   }
 });

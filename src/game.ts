@@ -110,6 +110,43 @@ export const createDomainSphere = (
 
 export const createFirstSphere = createDomainSphere;
 
+export const createRitual = (
+  state: AppState,
+  sphereId: string,
+  name: string,
+  targetMinutes: number | null,
+) => {
+  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  if (!sphere) return null;
+
+  const now = nowIso();
+  const ritual: Ritual = {
+    id: createId("ritual"),
+    sphereId,
+    name,
+    targetMinutes,
+    isFavorite: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  state.rituals.push(ritual);
+  sphere.ritualIds.push(ritual.id);
+  sphere.activeRitualId = ritual.id;
+  sphere.updatedAt = now;
+  return ritual;
+};
+
+export const setActiveRitual = (state: AppState, sphereId: string, ritualId: string) => {
+  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  const ritual = state.rituals.find((item) => item.id === ritualId && item.sphereId === sphereId);
+  if (!sphere || !ritual) return false;
+
+  sphere.activeRitualId = ritualId;
+  sphere.updatedAt = nowIso();
+  return true;
+};
+
 export const startSession = (state: AppState, sphereId: string) => {
   const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
   if (!sphere || state.activeSession) return;

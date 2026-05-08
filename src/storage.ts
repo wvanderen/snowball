@@ -66,6 +66,7 @@ export const localDateKey = (date = new Date()) => {
 
 export const createInitialState = (): AppState => {
   const now = nowIso();
+  const centerRituals = createCenterRecoveryRituals(now);
 
   return {
     version: 1,
@@ -76,8 +77,8 @@ export const createInitialState = (): AppState => {
         name: "Center",
         color: "#a78bfa",
         dailyTargetMinutes: 0,
-        activeRitualId: null,
-        ritualIds: [],
+        activeRitualId: centerRituals[0]?.id ?? null,
+        ritualIds: centerRituals.map((ritual) => ritual.id),
         glyphSlotCount: 0,
         equippedGlyphIds: [],
         level: 1,
@@ -95,7 +96,7 @@ export const createInitialState = (): AppState => {
         updatedAt: now,
       },
     ],
-    rituals: [],
+    rituals: centerRituals,
     sessions: [],
     connections: [],
     glyphs: createStarterGlyphs(now),
@@ -109,6 +110,39 @@ export const createInitialState = (): AppState => {
     activeSession: null,
   };
 };
+
+const createCenterRecoveryRituals = (now: string): Ritual[] => [
+  {
+    id: "ritual_center_breathe",
+    sphereId: centerSphereId,
+    name: "Breathe",
+    targetMinutes: 3,
+    isFavorite: true,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "ritual_center_rest",
+    sphereId: centerSphereId,
+    name: "Rest",
+    targetMinutes: null,
+    isFavorite: true,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "ritual_center_reset",
+    sphereId: centerSphereId,
+    name: "Reset",
+    targetMinutes: 5,
+    isFavorite: true,
+    archivedAt: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+];
 
 const createStarterGlyphs = (now: string): Glyph[] => [
   {
@@ -196,6 +230,21 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
     equippedGlyphIds: sphere.equippedGlyphIds ?? [],
     archivedAt: sphere.archivedAt ?? null,
   }));
+  const center = restored.spheres.find((sphere) => sphere.id === centerSphereId);
+  const existingCenterRituals = restored.rituals.filter(
+    (ritual) => ritual.sphereId === centerSphereId,
+  );
+  if (center) {
+    if (existingCenterRituals.length === 0) {
+      const centerRituals = createCenterRecoveryRituals(nowIso());
+      restored.rituals.push(...centerRituals);
+      center.activeRitualId = centerRituals[0]?.id ?? null;
+      center.ritualIds = centerRituals.map((ritual) => ritual.id);
+    } else {
+      center.ritualIds = existingCenterRituals.map((ritual) => ritual.id);
+      center.activeRitualId = center.activeRitualId ?? existingCenterRituals[0]?.id ?? null;
+    }
+  }
   restored.rituals = restored.rituals.map((ritual) => ({
     ...ritual,
     archivedAt: ritual.archivedAt ?? null,

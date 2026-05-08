@@ -1,11 +1,12 @@
 import "./style.css";
-import { type AppState, type Session, type Sphere } from "./domain.ts";
+import { type AppState, type Session, type Sphere, centerSphereId } from "./domain.ts";
 import {
   activeRitualsForSphere,
   applyPassiveProduction,
   archiveDomainSphere,
   archiveRitual,
   canUnlockSphereSlot,
+  centerRecoveryMultiplier,
   createDomainSphere,
   createRitual,
   domainSpheres,
@@ -278,6 +279,7 @@ const renderConnectionLines = (spheres: Sphere[], totalSlots: number) => {
 const renderHome = () => {
   ensureToday(state);
   const spheres = domainSpheres(state);
+  const center = state.spheres.find((sphere) => sphere.id === centerSphereId)!;
   const nextSlotCost = sphereSlotCost(state);
   const canUnlockSlot = canUnlockSphereSlot(state);
   const visibleLatticeSlots = spheres.length + 1;
@@ -309,21 +311,24 @@ const renderHome = () => {
           <svg class="connection-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
             ${renderConnectionLines(spheres, visibleLatticeSlots)}
           </svg>
-          <div class="sphere center-sphere">
+          <button class="sphere center-sphere ${state.activeSession?.sphereId === centerSphereId ? "is-active" : ""}" data-action="start-session" data-sphere-id="${centerSphereId}" aria-label="Center Sphere recovery rituals">
             <span class="sphere-core">
               <span class="sphere-name">Center</span>
-              <span class="sphere-meta">output</span>
+              <span class="sphere-meta">rest + recovery</span>
+              <span class="momentum-chip">Lv ${center.level}</span>
             </span>
-          </div>
+            <span class="ritual-pill">${getRitual(state, center.activeRitualId)?.name ?? "Breathe"}</span>
+          </button>
           ${spheres.map((sphere, index) => renderSphere(sphere, index, visibleLatticeSlots)).join("")}
           ${renderLockedSphereSlot(spheres.length, visibleLatticeSlots, nextSlotCost)}
         </div>
       </section>
 
       <section class="sphere-list">
+        ${renderCenterStats(center)}
         ${spheres.map(renderSphereStats).join("")}
       </section>
-      <p class="tap-hint">Tap any sphere to start immediately. New lattice slots unlock with energy; next slot costs ${round(nextSlotCost)} energy.</p>
+      <p class="tap-hint">Tap any sphere to start immediately. Center rituals are optional recovery, not another streak to maintain. New lattice slots unlock with energy; next slot costs ${round(nextSlotCost)} energy.</p>
       ${renderSessionHistory()}
 
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
@@ -364,6 +369,39 @@ const renderRitualHotbar = (sphere: Sphere) => {
         .join("")}
       <button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Ritual</button>
     </div>`;
+};
+
+const renderCenterStats = (center: Sphere) => {
+  const levelCost = sphereLevelCost(center);
+  const canAffordLevel = state.game.energy >= levelCost;
+  return `
+    <article class="sphere-stat-card" style="--sphere-color: ${center.color}">
+      <div class="sphere-stat-grid">
+        <div>
+          <p class="eyebrow">Center Sphere</p>
+          <strong>Recovery hub</strong>
+        </div>
+        <div>
+          <p class="eyebrow">Rest logged</p>
+          <strong>${formatMinutes(center.totalSeconds)}m</strong>
+        </div>
+        <div>
+          <p class="eyebrow">Today</p>
+          <strong>${formatMinutes(center.todaySeconds)}m</strong>
+        </div>
+        <div>
+          <p class="eyebrow">Level</p>
+          <strong>${center.level}</strong>
+        </div>
+      </div>
+      <div class="economy-row">
+        <span>Recovery ×${centerRecoveryMultiplier(state).toFixed(2)}</span>
+        <span>Rest gives gentle XP/energy and nudges domain momentum; no streaks, no required daily target.</span>
+        <button class="tiny-action upgrade-action" data-action="level-sphere" data-sphere-id="${center.id}" ${canAffordLevel ? "" : "disabled"}>Center upgrade · ${round(levelCost)} energy</button>
+      </div>
+      ${renderRitualHotbar(center)}
+      ${renderActiveRitualHistory(center)}
+    </article>`;
 };
 
 const renderSphereStats = (sphere: Sphere) => {

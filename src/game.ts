@@ -13,7 +13,13 @@ const secondsPerMinute = 60;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const maxPassiveElapsedSeconds = 8 * 60 * 60;
 
-export const sphereLevelCost = (sphere: Sphere) => Math.floor(50 * sphere.level ** 1.65);
+export const sphereLevelCost = (sphere: Sphere) =>
+  Math.floor((sphere.kind === "center" ? 120 : 50) * sphere.level ** 1.65);
+
+export const centerRecoveryMultiplier = (state: AppState) => {
+  const center = state.spheres.find((sphere) => sphere.id === centerSphereId);
+  return 1 + Math.max(0, (center?.level ?? 1) - 1) * 0.05;
+};
 
 export const glyphSlotsForLevel = (level: number) =>
   Math.min(3, 1 + Math.floor(Math.max(0, level - 1) / 3));
@@ -149,7 +155,10 @@ const missedMomentumDecay = (state: AppState, sphere: Sphere, today: string) => 
     sphere.todaySeconds > 0 ? momentumModel.partialMissDecay : momentumModel.missedDayDecay;
   const gapDecay = Math.max(0, elapsedDays - 1) * momentumModel.missedDayDecay;
   const baseDecay = Math.min(momentumModel.maxReturnGapDecay, firstMissDecay + gapDecay);
-  return hasGlyphEffect(state, sphere.id, "recovery") ? Math.floor(baseDecay * 0.7) : baseDecay;
+  const glyphAdjusted = hasGlyphEffect(state, sphere.id, "recovery")
+    ? Math.floor(baseDecay * 0.7)
+    : baseDecay;
+  return Math.floor(glyphAdjusted / centerRecoveryMultiplier(state));
 };
 
 export const domainSpheres = (state: AppState) =>
@@ -348,9 +357,7 @@ export const archiveDomainSphere = (state: AppState, sphereId: string) => {
 };
 
 export const purchaseSphereLevel = (state: AppState, sphereId: string) => {
-  const sphere = state.spheres.find(
-    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
-  );
+  const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
   if (!sphere) return false;
 
   const cost = sphereLevelCost(sphere);
@@ -388,9 +395,7 @@ export const createRitual = (
   name: string,
   targetMinutes: number | null,
 ) => {
-  const sphere = state.spheres.find(
-    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
-  );
+  const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
   if (!sphere) return null;
 
   const now = nowIso();
@@ -413,9 +418,7 @@ export const createRitual = (
 };
 
 export const setActiveRitual = (state: AppState, sphereId: string, ritualId: string) => {
-  const sphere = state.spheres.find(
-    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
-  );
+  const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
   const ritual = state.rituals.find(
     (item) => item.id === ritualId && item.sphereId === sphereId && !item.archivedAt,
   );
@@ -445,9 +448,7 @@ export const archiveRitual = (state: AppState, ritualId: string) => {
   const ritual = state.rituals.find((item) => item.id === ritualId && !item.archivedAt);
   if (!ritual || state.activeSession?.ritualId === ritualId) return false;
 
-  const sphere = state.spheres.find(
-    (item) => item.id === ritual.sphereId && item.kind === "domain" && !item.archivedAt,
-  );
+  const sphere = state.spheres.find((item) => item.id === ritual.sphereId && !item.archivedAt);
   if (!sphere) return false;
 
   const remaining = activeRitualsForSphere(state, sphere.id).filter((item) => item.id !== ritualId);
@@ -466,9 +467,7 @@ export const recentSessionsForRitual = (state: AppState, ritualId: string, limit
   state.sessions.filter((session) => session.ritualId === ritualId).slice(0, limit);
 
 export const startSession = (state: AppState, sphereId: string) => {
-  const sphere = state.spheres.find(
-    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
-  );
+  const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
   if (!sphere || state.activeSession) return;
 
   state.activeSession = {
@@ -500,6 +499,47 @@ export const finishActiveSession = (state: AppState) => {
 
   sphere.totalSeconds += durationSeconds;
   sphere.todaySeconds += durationSeconds;
+
+  if (sphere.kind === "center") {
+    const minutes = durationSeconds / secondsPerMinute;
+    const xpGained = minutes * 0.5;
+    const energyGained = minutes * centerRecoveryMultiplier(state);
+    const recoveryBoost = Math.min(4, Math.max(1, Math.floor(minutes / 5) + 1));
+    for (const domainSphere of domainSpheres(state)) {
+      domainSphere.momentum = clamp(domainSphere.momentum + recoveryBoost, 0, 100);
+      domainSphere.updatedAt = endedAt;
+    }
+    state.game.energy += energyGained;
+    state.game.lifetimeEnergy += energyGained;
+    state.game.experience += xpGained;
+    state.game.lifetimeExperience += xpGained;
+
+    const session: Session = {
+      id: active.id,
+      sphereId: active.sphereId,
+      ritualId: active.ritualId,
+      startedAt: active.startedAt,
+      endedAt,
+      durationSeconds,
+      completedMilestoneAfterSession: false,
+      createdAt: active.startedAt,
+      updatedAt: endedAt,
+    };
+
+    state.sessions.unshift(session);
+    state.activeSession = null;
+    sphere.updatedAt = endedAt;
+
+    return {
+      session,
+      energyGained,
+      activeEnergy: energyGained,
+      milestoneEnergy: 0,
+      xpGained,
+      momentumBefore: sphere.momentum,
+      momentumAfter: sphere.momentum,
+    };
+  }
 
   const reachedMilestone =
     sphere.dailyTargetMinutes > 0 &&

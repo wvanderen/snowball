@@ -93,6 +93,36 @@ describe("core game calculations", () => {
     vi.useRealTimers();
   });
 
+  it("logs optional Center recovery rituals with gentle rewards and domain momentum recovery", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    createDomainSphere(state, "Study", "#38bdf8", 10);
+    const domain = state.spheres.find((item) => item.kind === "domain")!;
+    domain.momentum = 20;
+    const center = state.spheres.find((item) => item.kind === "center")!;
+
+    state.activeSession = {
+      id: "session_rest",
+      sphereId: center.id,
+      ritualId: center.activeRitualId,
+      startedAt: "2026-05-08T11:50:00.000Z",
+    };
+
+    const result = finishActiveSession(state);
+
+    expect(result).not.toBeNull();
+    expect(result!.session.sphereId).toBe(center.id);
+    expect(result!.session.completedMilestoneAfterSession).toBe(false);
+    expect(result!.energyGained).toBeCloseTo(10);
+    expect(result!.xpGained).toBeCloseTo(5);
+    expect(center.currentStreak).toBe(0);
+    expect(center.milestoneCompletedDate).toBeNull();
+    expect(domain.momentum).toBe(23);
+
+    vi.useRealTimers();
+  });
+
   it("finishes active sessions with milestone rewards, streaks, momentum, xp, and energy", () => {
     vi.useFakeTimers();
     setNow("2026-05-08T12:00:00.000Z");

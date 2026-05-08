@@ -40,6 +40,7 @@ export const createInitialState = (): AppState => {
         milestoneCompletedDate: null,
         passiveEnergyRate: 0,
         activeEnergyMultiplier: 1,
+        archivedAt: null,
         createdAt: now,
         updatedAt: now,
       },
@@ -85,7 +86,12 @@ export const parseBackupState = (raw: string): AppState => {
   }
   if (!isRecord(candidate.game)) throw new Error("Backup is missing game data.");
 
-  return { ...createInitialState(), ...candidate } as AppState;
+  const restored = { ...createInitialState(), ...candidate } as AppState;
+  restored.spheres = restored.spheres.map((sphere) => ({
+    ...sphere,
+    archivedAt: sphere.archivedAt ?? null,
+  }));
+  return restored;
 };
 
 export const createBackupJson = (state: AppState) =>

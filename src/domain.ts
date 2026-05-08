@@ -18,6 +18,7 @@ export type Sphere = {
   milestoneCompletedDate: string | null;
   passiveEnergyRate: number;
   activeEnergyMultiplier: number;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

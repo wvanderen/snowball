@@ -2,8 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   applyPassiveProduction,
+  archiveDomainSphere,
   createDomainSphere,
   createRitual,
+  domainSpheres,
   ensureToday,
   finishActiveSession,
   setActiveRitual,
@@ -182,6 +184,48 @@ describe("core game calculations", () => {
     expect(getRitualTargetMinutes(state, state.activeSession?.ritualId ?? null)).toBe(20);
 
     vi.useRealTimers();
+  });
+
+  it("archives spheres without deleting historical sessions", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    createDomainSphere(state, "Retired", "#38bdf8", 20);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    state.sessions.unshift({
+      id: "session_history",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-08T11:30:00.000Z",
+      endedAt: "2026-05-08T11:50:00.000Z",
+      durationSeconds: 1200,
+      completedMilestoneAfterSession: true,
+      createdAt: "2026-05-08T11:30:00.000Z",
+      updatedAt: "2026-05-08T11:50:00.000Z",
+    });
+
+    expect(archiveDomainSphere(state, sphere.id)).toBe(true);
+
+    expect(sphere.archivedAt).toBe("2026-05-08T12:00:00.000Z");
+    expect(domainSpheres(state)).toEqual([]);
+    expect(state.sessions[0]?.sphereId).toBe(sphere.id);
+    expect(state.spheres.find((item) => item.id === sphere.id)?.name).toBe("Retired");
+    expect(startSession(state, sphere.id)).toBeUndefined();
+    expect(state.activeSession).toBeNull();
+    expect(state.connections.every((connection) => !connection.active)).toBe(true);
+
+    vi.useRealTimers();
+  });
+
+  it("does not archive a sphere with an active session", () => {
+    const state = createInitialState();
+    createDomainSphere(state, "Active", "#38bdf8", 20);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    startSession(state, sphere.id);
+
+    expect(archiveDomainSphere(state, sphere.id)).toBe(false);
+    expect(sphere.archivedAt).toBeNull();
+    expect(domainSpheres(state)).toContain(sphere);
   });
 
   it("resets daily progress and penalizes momentum when a milestone was missed", () => {

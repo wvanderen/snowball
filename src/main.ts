@@ -2,6 +2,7 @@ import "./style.css";
 import { type AppState, type Session, type Sphere } from "./domain.ts";
 import {
   applyPassiveProduction,
+  archiveDomainSphere,
   createDomainSphere,
   createRitual,
   domainSpheres,
@@ -86,6 +87,7 @@ const renderEditSphereForm = (sphere: Sphere) => `
         <input name="color" type="color" value="${sphere.color}" />
       </label>
       <div class="form-actions">
+        <button type="button" class="danger ghost" data-action="archive-sphere" data-sphere-id="${sphere.id}">Archive</button>
         <button type="button" class="ghost" data-action="cancel-edit-sphere">Cancel</button>
         <button type="submit">Save sphere</button>
       </div>
@@ -456,6 +458,28 @@ app.addEventListener("click", (event) => {
   if (action === "cancel-edit-sphere") {
     editingSphereId = null;
     render();
+  }
+
+  if (action === "archive-sphere") {
+    const sphereId = actionElement.dataset.sphereId;
+    const sphere = state.spheres.find((item) => item.id === sphereId);
+    if (!sphereId || !sphere) return;
+
+    if (state.activeSession?.sphereId === sphereId) {
+      alert("Finish the active session before archiving this sphere.");
+      return;
+    }
+
+    if (
+      confirm(
+        `Archive ${sphere.name}? Its past sessions will stay in history, but it will leave the active lattice.`,
+      )
+    ) {
+      archiveDomainSphere(state, sphereId);
+      editingSphereId = null;
+      saveState(state);
+      render();
+    }
   }
 
   if (action === "show-create-ritual") {

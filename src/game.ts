@@ -14,7 +14,7 @@ const nowIso = () => new Date().toISOString();
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
 export const domainSpheres = (state: AppState) =>
-  state.spheres.filter((sphere) => sphere.kind === "domain");
+  state.spheres.filter((sphere) => sphere.kind === "domain" && !sphere.archivedAt);
 
 export const getRitual = (state: AppState, ritualId: string | null) =>
   ritualId ? (state.rituals.find((ritual) => ritual.id === ritualId) ?? null) : null;
@@ -90,6 +90,7 @@ export const createDomainSphere = (
     milestoneCompletedDate: null,
     passiveEnergyRate: 0.001,
     activeEnergyMultiplier: 6,
+    archivedAt: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -110,6 +111,24 @@ export const createDomainSphere = (
 
 export const createFirstSphere = createDomainSphere;
 
+export const archiveDomainSphere = (state: AppState, sphereId: string) => {
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!sphere || state.activeSession?.sphereId === sphereId) return false;
+
+  const now = nowIso();
+  sphere.archivedAt = now;
+  sphere.updatedAt = now;
+  for (const connection of state.connections) {
+    if (connection.fromSphereId === sphereId || connection.toSphereId === sphereId) {
+      connection.active = false;
+      connection.updatedAt = now;
+    }
+  }
+  return true;
+};
+
 export const updateDomainSphere = (
   state: AppState,
   sphereId: string,
@@ -117,7 +136,9 @@ export const updateDomainSphere = (
   color: string,
   dailyTargetMinutes: number,
 ) => {
-  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
   if (!sphere) return false;
 
   sphere.name = name;
@@ -133,7 +154,9 @@ export const createRitual = (
   name: string,
   targetMinutes: number | null,
 ) => {
-  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
   if (!sphere) return null;
 
   const now = nowIso();
@@ -155,7 +178,9 @@ export const createRitual = (
 };
 
 export const setActiveRitual = (state: AppState, sphereId: string, ritualId: string) => {
-  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
   const ritual = state.rituals.find((item) => item.id === ritualId && item.sphereId === sphereId);
   if (!sphere || !ritual) return false;
 
@@ -165,7 +190,9 @@ export const setActiveRitual = (state: AppState, sphereId: string, ritualId: str
 };
 
 export const startSession = (state: AppState, sphereId: string) => {
-  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
   if (!sphere || state.activeSession) return;
 
   state.activeSession = {

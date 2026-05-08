@@ -12,6 +12,7 @@ import {
   getRitual,
   setActiveRitual,
   startSession,
+  updateDomainSphere,
 } from "./game.ts";
 import { loadState, resetState, saveState } from "./storage.ts";
 
@@ -19,6 +20,7 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 let state: AppState = loadState();
 let lastReward: string | null = null;
 let isCreatingSphere = false;
+let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
 
 const round = (value: number) => Math.floor(value).toLocaleString();
@@ -49,6 +51,33 @@ const spherePosition = (index: number, total: number) => {
     y: 50 + Math.sin(angle) * radius,
   };
 };
+
+const renderEditSphereForm = (sphere: Sphere) => `
+  <section class="intro-card compact-card">
+    <p class="eyebrow">Edit sphere</p>
+    <h1>${sphere.name}</h1>
+    <form id="edit-sphere-form" class="sphere-form" data-sphere-id="${sphere.id}">
+      <label>
+        Sphere name
+        <input name="name" autocomplete="off" required maxlength="32" value="${sphere.name}" />
+      </label>
+      <label>
+        Daily milestone
+        <div class="inline-input">
+          <input name="target" type="number" min="1" max="240" value="${sphere.dailyTargetMinutes}" required />
+          <span>minutes</span>
+        </div>
+      </label>
+      <label>
+        Color
+        <input name="color" type="color" value="${sphere.color}" />
+      </label>
+      <div class="form-actions">
+        <button type="button" class="ghost" data-action="cancel-edit-sphere">Cancel</button>
+        <button type="submit">Save sphere</button>
+      </div>
+    </form>
+  </section>`;
 
 const renderRitualForm = (sphere: Sphere) => `
   <section class="intro-card compact-card">
@@ -176,6 +205,7 @@ const renderHome = () => {
       ${renderSessionHistory()}
 
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
+      ${renderEditSphereModal()}
       ${renderRitualModal()}
       ${state.activeSession ? renderSessionOverlay() : ""}
       ${lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
@@ -219,9 +249,19 @@ const renderSphereStats = (sphere: Sphere) => {
           <p class="eyebrow">Today</p>
           <strong>${formatMinutes(sphere.todaySeconds)}m</strong>
         </div>
+        <button class="tiny-action" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Edit</button>
       </div>
       ${renderRitualHotbar(sphere)}
     </article>`;
+};
+
+const renderEditSphereModal = () => {
+  if (!editingSphereId) return "";
+
+  const sphere = state.spheres.find(
+    (item) => item.id === editingSphereId && item.kind === "domain",
+  );
+  return sphere ? `<div class="modal-scrim">${renderEditSphereForm(sphere)}</div>` : "";
 };
 
 const renderRitualModal = () => {
@@ -314,6 +354,14 @@ app.addEventListener("submit", (event) => {
     isCreatingSphere = false;
   }
 
+  if (form.id === "edit-sphere-form") {
+    const rawColor = data.get("color");
+    const sphereId = form.dataset.sphereId;
+    const color = typeof rawColor === "string" ? rawColor : "#7dd3fc";
+    if (sphereId) updateDomainSphere(state, sphereId, name, color, target ?? 20);
+    editingSphereId = null;
+  }
+
   if (form.id === "create-ritual-form") {
     const sphereId = form.dataset.sphereId;
     if (sphereId) createRitual(state, sphereId, name, target);
@@ -340,6 +388,16 @@ app.addEventListener("click", (event) => {
 
   if (action === "cancel-create-sphere") {
     isCreatingSphere = false;
+    render();
+  }
+
+  if (action === "show-edit-sphere") {
+    editingSphereId = actionElement.dataset.sphereId ?? null;
+    render();
+  }
+
+  if (action === "cancel-edit-sphere") {
+    editingSphereId = null;
     render();
   }
 
@@ -386,6 +444,7 @@ app.addEventListener("click", (event) => {
     state = loadState();
     lastReward = null;
     isCreatingSphere = false;
+    editingSphereId = null;
     creatingRitualForSphereId = null;
     render();
   }

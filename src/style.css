@@ -115,6 +115,14 @@ input:focus-visible {
   background: rgba(255, 255, 255, 0.07);
 }
 
+.tiny-action {
+  min-height: 34px;
+  padding: 0 12px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.07);
+  font-size: 0.78rem;
+}
+
 .lattice-card {
   position: relative;
   overflow: hidden;
@@ -271,7 +279,7 @@ input:focus-visible {
 
 .sphere-stat-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr;
+  grid-template-columns: 1.3fr 1fr 1fr auto;
   gap: 10px;
   align-items: center;
 }

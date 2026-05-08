@@ -110,6 +110,23 @@ export const createDomainSphere = (
 
 export const createFirstSphere = createDomainSphere;
 
+export const updateDomainSphere = (
+  state: AppState,
+  sphereId: string,
+  name: string,
+  color: string,
+  dailyTargetMinutes: number,
+) => {
+  const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");
+  if (!sphere) return false;
+
+  sphere.name = name;
+  sphere.color = color;
+  sphere.dailyTargetMinutes = dailyTargetMinutes;
+  sphere.updatedAt = nowIso();
+  return true;
+};
+
 export const createRitual = (
   state: AppState,
   sphereId: string,

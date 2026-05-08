@@ -22,13 +22,30 @@ export const sphereSlotCost = (state: AppState) => {
 
 export const canUnlockSphereSlot = (state: AppState) => state.game.energy >= sphereSlotCost(state);
 
-export const sphereRates = (sphere: Sphere) => {
+export const sphereRates = (sphere: Sphere, buffMultiplier = 1) => {
   const momentumMultiplier = 0.25 + sphere.momentum / 100;
-  const passivePerHour = sphere.passiveEnergyRate * sphere.level * momentumMultiplier * 60 * 60;
+  const passivePerHour =
+    sphere.passiveEnergyRate * sphere.level * momentumMultiplier * buffMultiplier * 60 * 60;
   const activePerMinute =
-    (1 + sphere.momentum / 100) * sphere.level * sphere.activeEnergyMultiplier;
+    (1 + sphere.momentum / 100) * sphere.level * sphere.activeEnergyMultiplier * buffMultiplier;
   return { passivePerHour, activePerMinute };
 };
+
+export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string) => {
+  const activeSphereId = state.activeSession?.sphereId;
+  if (!activeSphereId || activeSphereId === sphereId) return 1;
+
+  const hasActiveRoute = state.connections.some(
+    (connection) =>
+      connection.active &&
+      ((connection.fromSphereId === activeSphereId && connection.toSphereId === sphereId) ||
+        (connection.fromSphereId === sphereId && connection.toSphereId === activeSphereId)),
+  );
+  return hasActiveRoute ? 1.25 : 1;
+};
+
+export const routedSphereRates = (state: AppState, sphere: Sphere) =>
+  sphereRates(sphere, connectedSphereBuffMultiplier(state, sphere.id));
 
 export const momentumModel = {
   partialMissDecay: 3,
@@ -93,7 +110,7 @@ export const applyPassiveProduction = (state: AppState) => {
   if (elapsedSeconds < 30) return 0;
 
   const energyPerSecond = domainSpheres(state).reduce((total, sphere) => {
-    const { passivePerHour } = sphereRates(sphere);
+    const { passivePerHour } = routedSphereRates(state, sphere);
     return total + passivePerHour / (60 * 60);
   }, 0);
 
@@ -168,6 +185,72 @@ export const createDomainSphere = (
 };
 
 export const createFirstSphere = createDomainSphere;
+
+export const connectionForSphere = (state: AppState, sphereId: string) =>
+  state.connections.find(
+    (connection) => connection.fromSphereId === sphereId || connection.toSphereId === sphereId,
+  ) ?? null;
+
+export const toggleConnection = (state: AppState, connectionId: string) => {
+  const connection = state.connections.find((item) => item.id === connectionId);
+  if (!connection) return false;
+
+  connection.active = !connection.active;
+  connection.updatedAt = nowIso();
+  return true;
+};
+
+export const reverseConnection = (state: AppState, connectionId: string) => {
+  const connection = state.connections.find((item) => item.id === connectionId);
+  if (
+    !connection ||
+    connection.fromSphereId === centerSphereId ||
+    connection.toSphereId === centerSphereId
+  ) {
+    return false;
+  }
+
+  [connection.fromSphereId, connection.toSphereId] = [
+    connection.toSphereId,
+    connection.fromSphereId,
+  ];
+  connection.updatedAt = nowIso();
+  return true;
+};
+
+export const routeConnectionToSphere = (
+  state: AppState,
+  sphereId: string,
+  targetSphereId: string,
+) => {
+  if (sphereId === centerSphereId || sphereId === targetSphereId) return false;
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  const target = state.spheres.find((item) => item.id === targetSphereId && !item.archivedAt);
+  if (!sphere || !target) return false;
+
+  const now = nowIso();
+  let connection = connectionForSphere(state, sphereId);
+  if (!connection) {
+    connection = {
+      id: createId("connection"),
+      fromSphereId: sphereId,
+      toSphereId: targetSphereId,
+      active: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.connections.push(connection);
+    return true;
+  }
+
+  connection.fromSphereId = sphereId;
+  connection.toSphereId = targetSphereId;
+  connection.active = true;
+  connection.updatedAt = now;
+  return true;
+};
 
 export const archiveDomainSphere = (state: AppState, sphereId: string) => {
   const sphere = state.spheres.find(
@@ -359,7 +442,7 @@ export const finishActiveSession = (state: AppState) => {
   const momentumBefore = sphere.momentum;
   sphere.momentum = clamp(sphere.momentum + momentumSessionBoost + milestoneMomentumBoost, 0, 100);
 
-  const { activePerMinute } = sphereRates(sphere);
+  const { activePerMinute } = routedSphereRates(state, sphere);
   const activeEnergy = minutes * activePerMinute;
   const milestoneEnergy = completedMilestoneAfterSession ? sphere.dailyTargetMinutes * 2 : 0;
   const energyGained = activeEnergy + milestoneEnergy;

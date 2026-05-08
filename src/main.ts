@@ -14,12 +14,16 @@ import {
   formatDuration,
   formatMinutes,
   getRitual,
+  connectionForSphere,
   recentSessionsForRitual,
+  reverseConnection,
+  routeConnectionToSphere,
+  routedSphereRates,
   setActiveRitual,
   sphereLevelCost,
-  sphereRates,
   sphereSlotCost,
   purchaseSphereLevel,
+  toggleConnection,
   startSession,
   updateDomainSphere,
   updateRitual,
@@ -235,21 +239,33 @@ const renderSphere = (sphere: Sphere, index: number, totalSlots: number) => {
     </button>`;
 };
 
-const renderConnectionLines = (spheres: Sphere[], totalSlots: number) =>
-  spheres
-    .map((sphere, index) => {
-      const position = spherePosition(index, totalSlots);
-      const isActive = state.activeSession?.sphereId === sphere.id;
-      const completed = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
-      const progress = sphereProgress(sphere);
-      return `<g class="lattice-connection ${isActive ? "is-flowing" : ""} ${completed ? "is-complete" : ""}" style="--sphere-color: ${sphere.color}; --momentum: ${Math.round(sphere.momentum)}; --progress: ${Math.round(progress)}%">
-        <line class="lattice-line" x1="50" y1="50" x2="${position.x}" y2="${position.y}" />
-        <circle class="flow-particle" r="0.85" cx="50" cy="50">
-          <animateMotion dur="${Math.max(1.4, 3.4 - sphere.momentum / 45).toFixed(1)}s" repeatCount="indefinite" path="M 0 0 L ${position.x - 50} ${position.y - 50}" />
+const renderConnectionLines = (spheres: Sphere[], totalSlots: number) => {
+  const positionForSphere = (sphereId: string) => {
+    if (sphereId === "center") return { x: 50, y: 50 };
+    const index = spheres.findIndex((sphere) => sphere.id === sphereId);
+    return index >= 0 ? spherePosition(index, totalSlots) : null;
+  };
+
+  return state.connections
+    .filter((connection) => connection.active)
+    .map((connection) => {
+      const source = state.spheres.find((sphere) => sphere.id === connection.fromSphereId);
+      const from = positionForSphere(connection.fromSphereId);
+      const to = positionForSphere(connection.toSphereId);
+      if (!source || !from || !to) return "";
+
+      const isFlowing = state.activeSession?.sphereId === connection.fromSphereId;
+      const completed = source.milestoneCompletedDate === source.dailyProgressDate;
+      const progress = source.kind === "domain" ? sphereProgress(source) : 0;
+      return `<g class="lattice-connection ${isFlowing ? "is-flowing" : ""} ${completed ? "is-complete" : ""}" style="--sphere-color: ${source.color}; --momentum: ${Math.round(source.momentum)}; --progress: ${Math.round(progress)}%">
+        <line class="lattice-line" x1="${from.x}" y1="${from.y}" x2="${to.x}" y2="${to.y}" />
+        <circle class="flow-particle" r="0.85" cx="${from.x}" cy="${from.y}">
+          <animateMotion dur="${Math.max(1.4, 3.4 - source.momentum / 45).toFixed(1)}s" repeatCount="indefinite" path="M 0 0 L ${to.x - from.x} ${to.y - from.y}" />
         </circle>
       </g>`;
     })
     .join("");
+};
 
 const renderHome = () => {
   ensureToday(state);
@@ -271,7 +287,7 @@ const renderHome = () => {
         </div>
         <div>
           <p class="eyebrow">Passive</p>
-          <strong>${round(spheres.reduce((sum, sphere) => sum + sphereRates(sphere).passivePerHour, 0))}/h</strong>
+          <strong>${round(spheres.reduce((sum, sphere) => sum + routedSphereRates(state, sphere).passivePerHour, 0))}/h</strong>
         </div>
         <button class="ghost" data-action="show-create-sphere" ${canUnlockSlot ? "" : "disabled"}>${canUnlockSlot ? "Add" : `Locked · ${round(nextSlotCost)} energy`}</button>
         <button class="ghost" data-action="export-backup">Export</button>
@@ -345,8 +361,15 @@ const renderRitualHotbar = (sphere: Sphere) => {
 const renderSphereStats = (sphere: Sphere) => {
   const milestoneDone = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
   const levelCost = sphereLevelCost(sphere);
-  const rates = sphereRates(sphere);
+  const rates = routedSphereRates(state, sphere);
   const canAffordLevel = state.game.energy >= levelCost;
+  const connection = connectionForSphere(state, sphere.id);
+  const routeOptions = [
+    { id: "center", name: "Center" },
+    ...domainSpheres(state)
+      .filter((item) => item.id !== sphere.id)
+      .map((item) => ({ id: item.id, name: item.name })),
+  ];
 
   return `
     <article class="sphere-stat-card" style="--sphere-color: ${sphere.color}">
@@ -374,6 +397,18 @@ const renderSphereStats = (sphere: Sphere) => {
         <span>Passive ${rates.passivePerHour.toFixed(1)}/h</span>
         <button class="tiny-action upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Level up · ${round(levelCost)} energy</button>
       </div>
+      ${
+        connection
+          ? `<div class="route-row">
+        <span>${connection.active ? "Route on" : "Route off"}: ${connection.fromSphereId === sphere.id ? "to" : "from"} ${routeOptions.find((item) => item.id === (connection.fromSphereId === sphere.id ? connection.toSphereId : connection.fromSphereId))?.name ?? "Center"}</span>
+        <button class="tiny-action" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Disable" : "Enable"}</button>
+        <button class="tiny-action" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === "center" || connection.toSphereId === "center" ? "disabled" : ""}>Reverse</button>
+        <select class="route-select" data-action="route-connection" data-sphere-id="${sphere.id}">
+          ${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>Route to ${option.name}</option>`).join("")}
+        </select>
+      </div>`
+          : ""
+      }
       ${renderRitualHotbar(sphere)}
       ${renderActiveRitualHistory(sphere)}
     </article>`;
@@ -542,6 +577,14 @@ app.addEventListener("submit", (event) => {
 
 app.addEventListener("change", async (event) => {
   const input = event.target;
+  if (input instanceof HTMLSelectElement && input.dataset.action === "route-connection") {
+    const sphereId = input.dataset.sphereId;
+    if (sphereId) routeConnectionToSphere(state, sphereId, input.value);
+    saveState(state);
+    render();
+    return;
+  }
+
   if (!(input instanceof HTMLInputElement) || input.id !== backupInputId) return;
 
   const file = input.files?.[0];
@@ -656,6 +699,20 @@ app.addEventListener("click", (event) => {
   if (action === "level-sphere") {
     const sphereId = actionElement.dataset.sphereId;
     if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Sphere leveled up";
+    saveState(state);
+    render();
+  }
+
+  if (action === "toggle-connection") {
+    const connectionId = actionElement.dataset.connectionId;
+    if (connectionId) toggleConnection(state, connectionId);
+    saveState(state);
+    render();
+  }
+
+  if (action === "reverse-connection") {
+    const connectionId = actionElement.dataset.connectionId;
+    if (connectionId) reverseConnection(state, connectionId);
     saveState(state);
     render();
   }

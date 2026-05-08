@@ -4,6 +4,8 @@ import {
   activeRitualsForSphere,
   applyPassiveProduction,
   archiveDomainSphere,
+  connectedSphereBuffMultiplier,
+  connectionForSphere,
   archiveRitual,
   createDomainSphere,
   createRitual,
@@ -12,10 +14,13 @@ import {
   finishActiveSession,
   purchaseSphereLevel,
   recentSessionsForRitual,
+  reverseConnection,
+  routeConnectionToSphere,
   setActiveRitual,
   sphereLevelCost,
   sphereSlotCost,
   startSession,
+  toggleConnection,
   updateDomainSphere,
   updateRitual,
 } from "./game.ts";
@@ -183,6 +188,40 @@ describe("core game calculations", () => {
     expect(sphere.milestoneCompletedDate).toBe(localDateKey());
 
     vi.useRealTimers();
+  });
+
+  it("routes connections, toggles active flow, reverses domain routes, and keeps center as output", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 500;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+
+    const connection = connectionForSphere(state, first.id)!;
+    expect(connection.toSphereId).toBe("center");
+    expect(toggleConnection(state, connection.id)).toBe(true);
+    expect(connection.active).toBe(false);
+    expect(reverseConnection(state, connection.id)).toBe(false);
+    expect(connection.toSphereId).toBe("center");
+
+    expect(routeConnectionToSphere(state, first.id, second.id)).toBe(true);
+    expect(connection.active).toBe(true);
+    expect(connection.toSphereId).toBe(second.id);
+    expect(reverseConnection(state, connection.id)).toBe(true);
+    expect(connection.fromSphereId).toBe(second.id);
+    expect(connection.toSphereId).toBe(first.id);
+  });
+
+  it("buffs nodes connected to the active sphere", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 500;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    routeConnectionToSphere(state, first.id, second.id);
+
+    startSession(state, first.id);
+
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.25);
+    expect(connectedSphereBuffMultiplier(state, first.id)).toBe(1);
   });
 
   it("purchases sphere levels with spendable energy and increasing costs", () => {

@@ -1,16 +1,20 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  activeRitualsForSphere,
   applyPassiveProduction,
   archiveDomainSphere,
+  archiveRitual,
   createDomainSphere,
   createRitual,
   domainSpheres,
   ensureToday,
   finishActiveSession,
+  recentSessionsForRitual,
   setActiveRitual,
   startSession,
   updateDomainSphere,
+  updateRitual,
 } from "./game.ts";
 import { createBackupJson, createInitialState, localDateKey, parseBackupState } from "./storage.ts";
 
@@ -182,6 +186,43 @@ describe("core game calculations", () => {
 
     expect(state.activeSession?.ritualId).toBe(defaultRitualId);
     expect(getRitualTargetMinutes(state, state.activeSession?.ritualId ?? null)).toBe(20);
+
+    vi.useRealTimers();
+  });
+
+  it("edits and archives rituals while preserving ritual history", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    createDomainSphere(state, "Music", "#38bdf8", 20);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    const defaultRitualId = sphere.activeRitualId!;
+    const ritual = createRitual(state, sphere.id, "Scales", 10)!;
+    state.sessions.unshift({
+      id: "session_scales",
+      sphereId: sphere.id,
+      ritualId: ritual.id,
+      startedAt: "2026-05-08T11:30:00.000Z",
+      endedAt: "2026-05-08T11:40:00.000Z",
+      durationSeconds: 600,
+      completedMilestoneAfterSession: false,
+      createdAt: "2026-05-08T11:30:00.000Z",
+      updatedAt: "2026-05-08T11:40:00.000Z",
+    });
+
+    expect(updateRitual(state, ritual.id, "Arpeggios", null)).toBe(true);
+    expect(ritual.name).toBe("Arpeggios");
+    expect(ritual.targetMinutes).toBeNull();
+    expect(recentSessionsForRitual(state, ritual.id)).toHaveLength(1);
+    expect(archiveRitual(state, ritual.id)).toBe(true);
+
+    expect(ritual.archivedAt).toBe("2026-05-08T12:00:00.000Z");
+    expect(activeRitualsForSphere(state, sphere.id).map((item) => item.id)).toEqual([
+      defaultRitualId,
+    ]);
+    expect(sphere.activeRitualId).toBe(defaultRitualId);
+    expect(state.sessions[0]?.ritualId).toBe(ritual.id);
+    expect(setActiveRitual(state, sphere.id, ritual.id)).toBe(false);
 
     vi.useRealTimers();
   });

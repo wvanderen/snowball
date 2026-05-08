@@ -29,6 +29,7 @@ export type Ritual = {
   name: string;
   targetMinutes: number | null;
   isFavorite: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };

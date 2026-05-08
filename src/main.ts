@@ -1,8 +1,10 @@
 import "./style.css";
 import { type AppState, type Session, type Sphere } from "./domain.ts";
 import {
+  activeRitualsForSphere,
   applyPassiveProduction,
   archiveDomainSphere,
+  archiveRitual,
   createDomainSphere,
   createRitual,
   domainSpheres,
@@ -11,9 +13,11 @@ import {
   formatDuration,
   formatMinutes,
   getRitual,
+  recentSessionsForRitual,
   setActiveRitual,
   startSession,
   updateDomainSphere,
+  updateRitual,
 } from "./game.ts";
 import { createBackupJson, loadState, parseBackupState, resetState, saveState } from "./storage.ts";
 
@@ -35,6 +39,7 @@ let timerCompletedSessionId: string | null = null;
 let isCreatingSphere = false;
 let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
+let editingRitualId: string | null = null;
 
 const backupInputId = "backup-import-input";
 const round = (value: number) => Math.floor(value).toLocaleString();
@@ -117,6 +122,36 @@ const renderRitualForm = (sphere: Sphere) => `
       </div>
     </form>
   </section>`;
+
+const renderEditRitualForm = (ritualId: string) => {
+  const ritual = getRitual(state, ritualId);
+  const sphere = ritual ? state.spheres.find((item) => item.id === ritual.sphereId) : null;
+  if (!ritual || ritual.archivedAt || !sphere) return "";
+
+  return `
+  <section class="intro-card compact-card">
+    <p class="eyebrow">${sphere.name}</p>
+    <h1>Edit ritual.</h1>
+    <form id="edit-ritual-form" class="sphere-form" data-ritual-id="${ritual.id}">
+      <label>
+        Ritual name
+        <input name="name" autocomplete="off" required maxlength="36" value="${ritual.name}" />
+      </label>
+      <label>
+        Optional target
+        <div class="inline-input">
+          <input name="target" type="number" min="1" max="240" placeholder="Count up" value="${ritual.targetMinutes ?? ""}" />
+          <span>minutes</span>
+        </div>
+      </label>
+      <div class="form-actions">
+        <button type="button" class="danger ghost" data-action="archive-ritual" data-ritual-id="${ritual.id}">Archive</button>
+        <button type="button" class="ghost" data-action="cancel-edit-ritual">Cancel</button>
+        <button type="submit">Save ritual</button>
+      </div>
+    </form>
+  </section>`;
+};
 
 const renderSphereForm = (isFirstRun: boolean) => `
   <section class="intro-card">
@@ -227,24 +262,26 @@ const renderHome = () => {
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
       ${renderEditSphereModal()}
       ${renderRitualModal()}
+      ${renderEditRitualModal()}
       ${state.activeSession ? renderSessionOverlay() : ""}
       ${lastCompletion ? renderCompletionFeedback(lastCompletion) : lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
     </main>`;
 };
 
 const renderRitualHotbar = (sphere: Sphere) => {
-  const rituals = state.rituals.filter(
-    (ritual) => ritual.sphereId === sphere.id && ritual.isFavorite,
-  );
+  const rituals = activeRitualsForSphere(state, sphere.id).filter((ritual) => ritual.isFavorite);
 
   return `
     <div class="ritual-hotbar" aria-label="${sphere.name} rituals">
       ${rituals
         .map(
           (ritual) => `
-            <button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">
-              ${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}
-            </button>`,
+            <span class="ritual-chip-wrap">
+              <button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">
+                ${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}
+              </button>
+              <button class="ritual-edit-button" data-action="show-edit-ritual" data-ritual-id="${ritual.id}" aria-label="Edit ${ritual.name}">Edit</button>
+            </span>`,
         )
         .join("")}
       <button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Ritual</button>
@@ -272,6 +309,7 @@ const renderSphereStats = (sphere: Sphere) => {
         <button class="tiny-action" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Edit</button>
       </div>
       ${renderRitualHotbar(sphere)}
+      ${renderActiveRitualHistory(sphere)}
     </article>`;
 };
 
@@ -289,6 +327,25 @@ const renderRitualModal = () => {
 
   const sphere = state.spheres.find((item) => item.id === creatingRitualForSphereId);
   return sphere ? `<div class="modal-scrim">${renderRitualForm(sphere)}</div>` : "";
+};
+
+const renderEditRitualModal = () =>
+  editingRitualId ? `<div class="modal-scrim">${renderEditRitualForm(editingRitualId)}</div>` : "";
+
+const renderActiveRitualHistory = (sphere: Sphere) => {
+  if (!sphere.activeRitualId) return "";
+  const ritual = getRitual(state, sphere.activeRitualId);
+  const sessions = recentSessionsForRitual(state, sphere.activeRitualId, 3);
+
+  return `
+    <div class="ritual-history">
+      <p class="eyebrow">${ritual?.name ?? "Ritual"} history</p>
+      ${
+        sessions.length > 0
+          ? `<ol>${sessions.map((session) => `<li>${formatDuration(session.durationSeconds)} · ${formatSessionTime(session.startedAt)}</li>`).join("")}</ol>`
+          : `<p class="empty-history">No sessions for this ritual yet.</p>`
+      }
+    </div>`;
 };
 
 const renderSessionHistoryItem = (session: Session) => {
@@ -402,6 +459,12 @@ app.addEventListener("submit", (event) => {
     creatingRitualForSphereId = null;
   }
 
+  if (form.id === "edit-ritual-form") {
+    const ritualId = form.dataset.ritualId;
+    if (ritualId) updateRitual(state, ritualId, name, target);
+    editingRitualId = null;
+  }
+
   saveState(state);
   render();
 });
@@ -425,6 +488,7 @@ app.addEventListener("change", async (event) => {
     isCreatingSphere = false;
     editingSphereId = null;
     creatingRitualForSphereId = null;
+    editingRitualId = null;
     render();
   } catch {
     alert("That file is not a valid Snowball backup.");
@@ -492,6 +556,32 @@ app.addEventListener("click", (event) => {
     render();
   }
 
+  if (action === "show-edit-ritual") {
+    editingRitualId = actionElement.dataset.ritualId ?? null;
+    render();
+  }
+
+  if (action === "cancel-edit-ritual") {
+    editingRitualId = null;
+    render();
+  }
+
+  if (action === "archive-ritual") {
+    const ritualId = actionElement.dataset.ritualId;
+    const ritual = getRitual(state, ritualId ?? null);
+    if (!ritualId || !ritual) return;
+    if (state.activeSession?.ritualId === ritualId) {
+      alert("Finish the active session before archiving this ritual.");
+      return;
+    }
+    if (confirm(`Archive ${ritual.name}? Past sessions will stay in history.`)) {
+      archiveRitual(state, ritualId);
+      editingRitualId = null;
+      saveState(state);
+      render();
+    }
+  }
+
   if (action === "set-active-ritual") {
     const sphereId = actionElement.dataset.sphereId;
     const ritualId = actionElement.dataset.ritualId;
@@ -554,6 +644,7 @@ app.addEventListener("click", (event) => {
     isCreatingSphere = false;
     editingSphereId = null;
     creatingRitualForSphereId = null;
+    editingRitualId = null;
     render();
   }
 });

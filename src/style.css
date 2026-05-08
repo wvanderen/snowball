@@ -335,6 +335,13 @@ input:focus-visible {
   padding-bottom: 2px;
 }
 
+.ritual-chip-wrap {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+}
+
 .ritual-chip {
   flex: 0 0 auto;
   min-height: 34px;
@@ -350,9 +357,33 @@ input:focus-visible {
   background: color-mix(in srgb, var(--sphere-color), white 20%);
 }
 
+.ritual-edit-button {
+  min-height: 28px;
+  padding: 0 8px;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.72rem;
+}
+
 .add-chip {
   color: var(--muted);
   background: transparent;
+}
+
+.ritual-history {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ritual-history ol {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--muted);
+  font-size: 0.82rem;
 }
 
 .tap-hint {

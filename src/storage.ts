@@ -91,6 +91,10 @@ export const parseBackupState = (raw: string): AppState => {
     ...sphere,
     archivedAt: sphere.archivedAt ?? null,
   }));
+  restored.rituals = restored.rituals.map((ritual) => ({
+    ...ritual,
+    archivedAt: ritual.archivedAt ?? null,
+  }));
   return restored;
 };
 

@@ -242,7 +242,15 @@ export const finishActiveSession = (state: AppState) => {
   state.activeSession = null;
   sphere.updatedAt = endedAt;
 
-  return { session, energyGained, xpGained, momentumBefore, momentumAfter: sphere.momentum };
+  return {
+    session,
+    energyGained,
+    activeEnergy,
+    milestoneEnergy,
+    xpGained,
+    momentumBefore,
+    momentumAfter: sphere.momentum,
+  };
 };
 
 export const formatMinutes = (seconds: number) => Math.floor(seconds / 60).toString();

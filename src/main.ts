@@ -18,7 +18,19 @@ import { loadState, resetState, saveState } from "./storage.ts";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let state: AppState = loadState();
+type CompletionFeedback = {
+  sphereId: string;
+  durationSeconds: number;
+  energyGained: number;
+  activeEnergy: number;
+  milestoneEnergy: number;
+  xpGained: number;
+  completedMilestone: boolean;
+};
+
 let lastReward: string | null = null;
+let lastCompletion: CompletionFeedback | null = null;
+let timerCompletedSessionId: string | null = null;
 let isCreatingSphere = false;
 let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
@@ -142,14 +154,16 @@ const renderSphere = (sphere: Sphere, index: number, spheres: Sphere[]) => {
   const progress = sphereProgress(sphere);
   const ritual = getRitual(state, sphere.activeRitualId);
   const isActive = state.activeSession?.sphereId === sphere.id;
+  const completion = lastCompletion?.sphereId === sphere.id ? lastCompletion : null;
   const position = spherePosition(index, spheres.length);
 
   return `
-    <button class="sphere domain-sphere ${isActive ? "is-active" : ""}" data-action="start-session" data-sphere-id="${sphere.id}" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --sphere-x: ${position.x}%; --sphere-y: ${position.y}%">
+    <button class="sphere domain-sphere ${isActive ? "is-active" : ""} ${completion ? "just-completed" : ""} ${completion?.completedMilestone ? "just-bloomed" : ""}" data-action="start-session" data-sphere-id="${sphere.id}" aria-label="${sphere.name}: ${Math.round(progress)}% of daily milestone${completion?.completedMilestone ? ", milestone bloom completed" : ""}" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --sphere-x: ${position.x}%; --sphere-y: ${position.y}%">
       <span class="progress-ring"></span>
       <span class="sphere-core">
         <span class="sphere-name">${sphere.name}</span>
         <span class="sphere-meta">${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</span>
+        ${completion?.completedMilestone ? `<span class="bloom-badge">Bloom</span>` : ""}
       </span>
       <span class="ritual-pill">${ritual?.name ?? "Focus"}</span>
     </button>`;
@@ -208,7 +222,7 @@ const renderHome = () => {
       ${renderEditSphereModal()}
       ${renderRitualModal()}
       ${state.activeSession ? renderSessionOverlay() : ""}
-      ${lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
+      ${lastCompletion ? renderCompletionFeedback(lastCompletion) : lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
     </main>`;
 };
 
@@ -306,6 +320,17 @@ const renderSessionHistory = () => {
     </section>`;
 };
 
+const renderCompletionFeedback = (feedback: CompletionFeedback) => `
+  <aside class="completion-toast ${feedback.completedMilestone ? "is-bloom" : ""}" role="status" aria-live="polite">
+    <p class="eyebrow">Session complete</p>
+    <strong>${formatDuration(feedback.durationSeconds)} logged</strong>
+    <div class="reward-grid">
+      <span>XP <b>+${Math.floor(feedback.xpGained)}</b></span>
+      <span>Energy <b>+${round(feedback.energyGained)}</b></span>
+      ${feedback.completedMilestone ? `<span class="bloom-reward">Bloom bonus <b>+${round(feedback.milestoneEnergy)}</b></span>` : ""}
+    </div>
+  </aside>`;
+
 const renderSessionOverlay = () => {
   const active = state.activeSession;
   if (!active) return "";
@@ -314,16 +339,19 @@ const renderSessionOverlay = () => {
   const ritual = getRitual(state, active.ritualId);
   const elapsed = activeElapsedSeconds();
   const targetSeconds = ritual?.targetMinutes ? ritual.targetMinutes * 60 : null;
+  const targetComplete = targetSeconds !== null && elapsed >= targetSeconds;
+  if (targetComplete) timerCompletedSessionId = active.id;
   const displaySeconds = targetSeconds ? Math.max(0, targetSeconds - elapsed) : elapsed;
 
   return `
-    <section class="session-sheet">
+    <section class="session-sheet ${targetComplete ? "target-complete" : ""}">
       <p class="eyebrow">Active sphere</p>
       <h2>${sphere?.name ?? "Session"}</h2>
       <p>${ritual?.name ?? "Focus"}</p>
       <div class="timer">${formatDuration(displaySeconds)}</div>
-      <p class="timer-mode">${targetSeconds ? "counting down ritual target" : "counting up"}</p>
-      <button data-action="finish-session">Stop & log session</button>
+      <p class="timer-mode">${targetComplete ? "ritual target complete" : targetSeconds ? "counting down ritual target" : "counting up"}</p>
+      ${targetComplete ? `<div class="timer-complete-alert" role="status" aria-live="assertive">Target complete — ready to log this ritual.</div>` : ""}
+      <button data-action="finish-session">${targetComplete ? "Log completed ritual" : "Stop & log session"}</button>
     </section>`;
 };
 
@@ -424,6 +452,8 @@ app.addEventListener("click", (event) => {
     if (sphereId) {
       startSession(state, sphereId);
       lastReward = null;
+      lastCompletion = null;
+      timerCompletedSessionId = null;
       saveState(state);
       render();
     }
@@ -432,9 +462,18 @@ app.addEventListener("click", (event) => {
   if (action === "finish-session") {
     const result = finishActiveSession(state);
     if (result) {
-      const milestone = result.session.completedMilestoneAfterSession ? " + milestone bloom" : "";
-      lastReward = `+${round(result.energyGained)} energy, +${Math.floor(result.xpGained)} XP${milestone}`;
+      lastReward = null;
+      lastCompletion = {
+        sphereId: result.session.sphereId,
+        durationSeconds: result.session.durationSeconds,
+        energyGained: result.energyGained,
+        activeEnergy: result.activeEnergy,
+        milestoneEnergy: result.milestoneEnergy,
+        xpGained: result.xpGained,
+        completedMilestone: result.session.completedMilestoneAfterSession,
+      };
     }
+    timerCompletedSessionId = null;
     saveState(state);
     render();
   }
@@ -443,6 +482,8 @@ app.addEventListener("click", (event) => {
     resetState();
     state = loadState();
     lastReward = null;
+    lastCompletion = null;
+    timerCompletedSessionId = null;
     isCreatingSphere = false;
     editingSphereId = null;
     creatingRitualForSphereId = null;
@@ -451,7 +492,20 @@ app.addEventListener("click", (event) => {
 });
 
 setInterval(() => {
-  if (state.activeSession) render();
+  if (!state.activeSession) return;
+
+  const ritual = getRitual(state, state.activeSession.ritualId);
+  const targetSeconds = ritual?.targetMinutes ? ritual.targetMinutes * 60 : null;
+  if (
+    targetSeconds !== null &&
+    timerCompletedSessionId !== state.activeSession.id &&
+    activeElapsedSeconds() >= targetSeconds
+  ) {
+    timerCompletedSessionId = state.activeSession.id;
+    if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+  }
+
+  render();
 }, 1000);
 
 render();

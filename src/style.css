@@ -214,6 +214,29 @@ input:focus-visible {
   animation: active-pulse 1.2s ease-in-out infinite;
 }
 
+.domain-sphere.just-completed::before {
+  box-shadow:
+    0 0 44px color-mix(in srgb, var(--sphere-color), transparent 20%),
+    0 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 78%),
+    inset 0 -16px 28px rgba(0, 0, 0, 0.34);
+}
+
+.domain-sphere.just-bloomed::after {
+  content: "Bloom complete";
+  position: absolute;
+  top: -2px;
+  padding: 5px 10px;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), white 18%);
+  border-radius: 999px;
+  color: #06111d;
+  background: color-mix(in srgb, var(--sphere-color), white 34%);
+  box-shadow: 0 0 26px color-mix(in srgb, var(--sphere-color), transparent 28%);
+  font-size: 0.68rem;
+  font-weight: 950;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
 .progress-ring {
   position: absolute;
   inset: 0;
@@ -245,6 +268,18 @@ input:focus-visible {
 
 .sphere-meta {
   font-size: 0.75rem;
+}
+
+.bloom-badge {
+  margin-top: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #06111d;
+  background: color-mix(in srgb, var(--sphere-color), white 35%);
+  font-size: 0.62rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .ritual-pill {
@@ -427,7 +462,29 @@ input:focus-visible {
   margin-top: 20px;
 }
 
-.toast {
+.session-sheet.target-complete {
+  border-color: rgba(125, 211, 252, 0.5);
+  box-shadow:
+    0 20px 70px rgba(0, 0, 0, 0.32),
+    0 0 36px rgba(125, 211, 252, 0.18);
+}
+
+.target-complete .timer {
+  color: #7dd3fc;
+}
+
+.timer-complete-alert {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 16px;
+  color: var(--white);
+  background: rgba(125, 211, 252, 0.12);
+  font-weight: 900;
+}
+
+.toast,
+.completion-toast {
   position: fixed;
   top: max(14px, env(safe-area-inset-top));
   right: 14px;
@@ -443,6 +500,47 @@ input:focus-visible {
   background: rgba(15, 23, 42, 0.92);
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.34);
   font-weight: 800;
+}
+
+.completion-toast {
+  display: grid;
+  gap: 7px;
+  min-width: min(360px, calc(100% - 28px));
+  border-radius: 22px;
+}
+
+.completion-toast.is-bloom {
+  border-color: rgba(250, 204, 21, 0.5);
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.34),
+    0 0 34px rgba(250, 204, 21, 0.22);
+}
+
+.completion-toast strong {
+  font-size: 1.05rem;
+}
+
+.reward-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reward-grid span {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.reward-grid b {
+  color: var(--white);
+}
+
+.reward-grid .bloom-reward {
+  color: #fef3c7;
+  background: rgba(250, 204, 21, 0.18);
 }
 
 .onboarding-shell {

@@ -9,9 +9,37 @@ import {
 import { createId, localDateKey } from "./storage.ts";
 
 const secondsPerMinute = 60;
+const millisecondsPerDay = 24 * 60 * 60 * 1000;
+
+export const momentumModel = {
+  partialMissDecay: 3,
+  missedDayDecay: 6,
+  maxReturnGapDecay: 30,
+  shortSessionBoost: 2,
+  focusedSessionBoost: 5,
+  milestoneBoost: 15,
+} as const;
 
 const nowIso = () => new Date().toISOString();
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+const daysBetweenLocalDateKeys = (from: string, to: string) => {
+  const fromTime = new Date(`${from}T00:00:00`).getTime();
+  const toTime = new Date(`${to}T00:00:00`).getTime();
+  if (Number.isNaN(fromTime) || Number.isNaN(toTime)) return 0;
+  return Math.max(0, Math.round((toTime - fromTime) / millisecondsPerDay));
+};
+
+const missedMomentumDecay = (sphere: Sphere, today: string) => {
+  if (sphere.kind !== "domain") return 0;
+  const elapsedDays = daysBetweenLocalDateKeys(sphere.dailyProgressDate, today);
+  if (elapsedDays <= 0 || sphere.milestoneCompletedDate === sphere.dailyProgressDate) return 0;
+
+  const firstMissDecay =
+    sphere.todaySeconds > 0 ? momentumModel.partialMissDecay : momentumModel.missedDayDecay;
+  const gapDecay = Math.max(0, elapsedDays - 1) * momentumModel.missedDayDecay;
+  return Math.min(momentumModel.maxReturnGapDecay, firstMissDecay + gapDecay);
+};
 
 export const domainSpheres = (state: AppState) =>
   state.spheres.filter((sphere) => sphere.kind === "domain" && !sphere.archivedAt);
@@ -27,11 +55,10 @@ export const ensureToday = (state: AppState) => {
 
   for (const sphere of state.spheres) {
     if (sphere.dailyProgressDate !== today) {
-      const missedMilestone =
-        sphere.kind === "domain" && sphere.milestoneCompletedDate !== sphere.dailyProgressDate;
+      const decay = missedMomentumDecay(sphere, today);
       sphere.todaySeconds = 0;
       sphere.dailyProgressDate = today;
-      sphere.momentum = missedMilestone ? clamp(sphere.momentum - 10, 0, 100) : sphere.momentum;
+      sphere.momentum = clamp(sphere.momentum - decay, 0, 100);
       sphere.updatedAt = nowIso();
     }
   }
@@ -284,8 +311,9 @@ export const finishActiveSession = (state: AppState) => {
 
   const minutes = durationSeconds / secondsPerMinute;
   const xpGained = minutes;
-  const momentumSessionBoost = minutes >= 5 ? 5 : 2;
-  const milestoneMomentumBoost = completedMilestoneAfterSession ? 15 : 0;
+  const momentumSessionBoost =
+    minutes >= 5 ? momentumModel.focusedSessionBoost : momentumModel.shortSessionBoost;
+  const milestoneMomentumBoost = completedMilestoneAfterSession ? momentumModel.milestoneBoost : 0;
   const momentumBefore = sphere.momentum;
   sphere.momentum = clamp(sphere.momentum + momentumSessionBoost + milestoneMomentumBoost, 0, 100);
 

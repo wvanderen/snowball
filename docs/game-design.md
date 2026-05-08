@@ -79,14 +79,17 @@ Momentum range:
 0..100
 ```
 
-Suggested v0 adjustments:
+Current v1 adjustments:
 
-- any short session: small boost
-- 5+ minute session: larger small boost
-- daily milestone: significant boost
-- missed day: gradual decay
+- any logged session under 5 minutes: +2 momentum
+- any logged session of 5+ minutes: +5 momentum
+- first daily milestone completion: +15 momentum
+- completed days roll forward with no decay
+- missed day with partial progress: -3 momentum
+- missed day with no progress: -6 momentum
+- return after a multi-day gap: add -6 for each extra missed day, capped at -30 total decay
 
-Momentum is intentionally recoverable. It is not a streak replacement with a different name; it should feel elastic.
+Momentum is intentionally recoverable. It is not a streak replacement with a different name; it should feel elastic. Partial sessions soften missed-day decay, and a long gap bends momentum without resetting it.
 
 ## Streak model
 

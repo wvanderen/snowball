@@ -269,7 +269,7 @@ describe("core game calculations", () => {
     expect(domainSpheres(state)).toContain(sphere);
   });
 
-  it("resets daily progress and penalizes momentum when a milestone was missed", () => {
+  it("resets daily progress and gently decays momentum when a partial day missed its milestone", () => {
     vi.useFakeTimers();
     setNow("2026-05-08T12:00:00.000Z");
     const state = createInitialState();
@@ -286,7 +286,27 @@ describe("core game calculations", () => {
 
     expect(sphere!.dailyProgressDate).toBe("2026-05-08");
     expect(sphere!.todaySeconds).toBe(0);
-    expect(sphere!.momentum).toBe(25);
+    expect(sphere!.momentum).toBe(32);
+
+    vi.useRealTimers();
+  });
+
+  it("decays missed days without harsh resets when returning after a gap", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    createDomainSphere(state, "Health", "#22c55e", 20);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    sphere.dailyProgressDate = "2026-05-01";
+    sphere.milestoneCompletedDate = null;
+    sphere.todaySeconds = 0;
+    sphere.momentum = 80;
+
+    ensureToday(state);
+
+    expect(sphere.dailyProgressDate).toBe("2026-05-08");
+    expect(sphere.todaySeconds).toBe(0);
+    expect(sphere.momentum).toBe(50);
 
     vi.useRealTimers();
   });

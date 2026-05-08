@@ -52,7 +52,7 @@ export const applyPassiveProduction = (state: AppState) => {
   return gained;
 };
 
-export const createFirstSphere = (
+export const createDomainSphere = (
   state: AppState,
   name: string,
   color: string,
@@ -107,6 +107,8 @@ export const createFirstSphere = (
   state.rituals.push(ritual);
   state.connections.push(connection);
 };
+
+export const createFirstSphere = createDomainSphere;
 
 export const startSession = (state: AppState, sphereId: string) => {
   const sphere = state.spheres.find((item) => item.id === sphereId && item.kind === "domain");

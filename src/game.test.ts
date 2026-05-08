@@ -10,8 +10,10 @@ import {
   domainSpheres,
   ensureToday,
   finishActiveSession,
+  purchaseSphereLevel,
   recentSessionsForRitual,
   setActiveRitual,
+  sphereLevelCost,
   startSession,
   updateDomainSphere,
   updateRitual,
@@ -40,6 +42,24 @@ describe("core game calculations", () => {
     expect(state.game.energy).toBeCloseTo(0.18);
     expect(state.game.lifetimeEnergy).toBeCloseTo(0.18);
     expect(state.game.lastPassiveTickAt).toBe("2026-05-08T12:00:00.000Z");
+
+    vi.useRealTimers();
+  });
+
+  it("caps passive production while away so active focus remains strongest", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    createDomainSphere(state, "Health", "#22c55e", 30);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    sphere.level = 3;
+    sphere.momentum = 100;
+    state.game.lastPassiveTickAt = "2026-05-07T12:00:00.000Z";
+
+    const gained = applyPassiveProduction(state);
+
+    expect(gained).toBeCloseTo(108);
+    expect(gained).toBeLessThan(15 * sphere.level * 2 * sphere.activeEnergyMultiplier);
 
     vi.useRealTimers();
   });
@@ -162,6 +182,21 @@ describe("core game calculations", () => {
     expect(sphere.milestoneCompletedDate).toBe(localDateKey());
 
     vi.useRealTimers();
+  });
+
+  it("purchases sphere levels with spendable energy and increasing costs", () => {
+    const state = createInitialState();
+    createDomainSphere(state, "Study", "#38bdf8", 20);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+
+    expect(sphereLevelCost(sphere)).toBe(50);
+    expect(purchaseSphereLevel(state, sphere.id)).toBe(false);
+
+    state.game.energy = 200;
+    expect(purchaseSphereLevel(state, sphere.id)).toBe(true);
+    expect(sphere.level).toBe(2);
+    expect(state.game.energy).toBe(150);
+    expect(sphereLevelCost(sphere)).toBeGreaterThan(50);
   });
 
   it("mutates spheres and rituals and uses the active ritual id without changing sphere timer target", () => {

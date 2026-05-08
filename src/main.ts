@@ -15,6 +15,9 @@ import {
   getRitual,
   recentSessionsForRitual,
   setActiveRitual,
+  sphereLevelCost,
+  sphereRates,
+  purchaseSphereLevel,
   startSession,
   updateDomainSphere,
   updateRitual,
@@ -252,6 +255,10 @@ const renderHome = () => {
           <p class="eyebrow">XP</p>
           <strong>${round(state.game.experience)}</strong>
         </div>
+        <div>
+          <p class="eyebrow">Passive</p>
+          <strong>${round(spheres.reduce((sum, sphere) => sum + sphereRates(sphere).passivePerHour, 0))}/h</strong>
+        </div>
         <button class="ghost" data-action="show-create-sphere">Add</button>
         <button class="ghost" data-action="export-backup">Export</button>
         <button class="ghost" data-action="import-backup">Import</button>
@@ -311,6 +318,9 @@ const renderRitualHotbar = (sphere: Sphere) => {
 
 const renderSphereStats = (sphere: Sphere) => {
   const milestoneDone = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
+  const levelCost = sphereLevelCost(sphere);
+  const rates = sphereRates(sphere);
+  const canAffordLevel = state.game.energy >= levelCost;
 
   return `
     <article class="sphere-stat-card" style="--sphere-color: ${sphere.color}">
@@ -327,7 +337,16 @@ const renderSphereStats = (sphere: Sphere) => {
           <p class="eyebrow">Today</p>
           <strong>${formatMinutes(sphere.todaySeconds)}m</strong>
         </div>
+        <div>
+          <p class="eyebrow">Level</p>
+          <strong>${sphere.level}</strong>
+        </div>
         <button class="tiny-action" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Edit</button>
+      </div>
+      <div class="economy-row">
+        <span>Active ${rates.activePerMinute.toFixed(1)}/m</span>
+        <span>Passive ${rates.passivePerHour.toFixed(1)}/h</span>
+        <button class="tiny-action upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Level up · ${round(levelCost)} energy</button>
       </div>
       ${renderRitualHotbar(sphere)}
       ${renderActiveRitualHistory(sphere)}
@@ -601,6 +620,13 @@ app.addEventListener("click", (event) => {
       saveState(state);
       render();
     }
+  }
+
+  if (action === "level-sphere") {
+    const sphereId = actionElement.dataset.sphereId;
+    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Sphere leveled up";
+    saveState(state);
+    render();
   }
 
   if (action === "set-active-ritual") {

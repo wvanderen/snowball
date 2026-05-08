@@ -399,9 +399,23 @@ input:focus-visible {
 
 .sphere-stat-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1fr 1fr auto;
+  grid-template-columns: 1.3fr 1fr 1fr 0.7fr auto;
   gap: 10px;
   align-items: center;
+}
+
+.economy-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.upgrade-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .ritual-hotbar {

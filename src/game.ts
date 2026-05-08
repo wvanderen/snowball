@@ -10,6 +10,17 @@ import { createId, localDateKey } from "./storage.ts";
 
 const secondsPerMinute = 60;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
+const maxPassiveElapsedSeconds = 8 * 60 * 60;
+
+export const sphereLevelCost = (sphere: Sphere) => Math.floor(50 * sphere.level ** 1.65);
+
+export const sphereRates = (sphere: Sphere) => {
+  const momentumMultiplier = 0.25 + sphere.momentum / 100;
+  const passivePerHour = sphere.passiveEnergyRate * sphere.level * momentumMultiplier * 60 * 60;
+  const activePerMinute =
+    (1 + sphere.momentum / 100) * sphere.level * sphere.activeEnergyMultiplier;
+  return { passivePerHour, activePerMinute };
+};
 
 export const momentumModel = {
   partialMissDecay: 3,
@@ -67,12 +78,15 @@ export const ensureToday = (state: AppState) => {
 export const applyPassiveProduction = (state: AppState) => {
   const now = new Date();
   const lastTick = new Date(state.game.lastPassiveTickAt);
-  const elapsedSeconds = Math.max(0, (now.getTime() - lastTick.getTime()) / 1000);
+  const elapsedSeconds = Math.min(
+    maxPassiveElapsedSeconds,
+    Math.max(0, (now.getTime() - lastTick.getTime()) / 1000),
+  );
   if (elapsedSeconds < 30) return 0;
 
   const energyPerSecond = domainSpheres(state).reduce((total, sphere) => {
-    const momentumMultiplier = 0.25 + sphere.momentum / 100;
-    return total + sphere.passiveEnergyRate * sphere.level * momentumMultiplier;
+    const { passivePerHour } = sphereRates(sphere);
+    return total + passivePerHour / (60 * 60);
   }, 0);
 
   const gained = energyPerSecond * elapsedSeconds;
@@ -157,6 +171,21 @@ export const archiveDomainSphere = (state: AppState, sphereId: string) => {
       connection.updatedAt = now;
     }
   }
+  return true;
+};
+
+export const purchaseSphereLevel = (state: AppState, sphereId: string) => {
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!sphere) return false;
+
+  const cost = sphereLevelCost(sphere);
+  if (state.game.energy < cost) return false;
+
+  state.game.energy -= cost;
+  sphere.level += 1;
+  sphere.updatedAt = nowIso();
   return true;
 };
 
@@ -317,8 +346,8 @@ export const finishActiveSession = (state: AppState) => {
   const momentumBefore = sphere.momentum;
   sphere.momentum = clamp(sphere.momentum + momentumSessionBoost + milestoneMomentumBoost, 0, 100);
 
-  const momentumMultiplier = 1 + sphere.momentum / 100;
-  const activeEnergy = minutes * sphere.level * momentumMultiplier * sphere.activeEnergyMultiplier;
+  const { activePerMinute } = sphereRates(sphere);
+  const activeEnergy = minutes * activePerMinute;
   const milestoneEnergy = completedMilestoneAfterSession ? sphere.dailyTargetMinutes * 2 : 0;
   const energyGained = activeEnergy + milestoneEnergy;
 

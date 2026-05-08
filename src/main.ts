@@ -31,7 +31,7 @@ import {
 import { createBackupJson, loadState, parseBackupState, resetState, saveState } from "./storage.ts";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
-let state: AppState = loadState();
+let state: AppState = await loadState();
 type CompletionFeedback = {
   sphereId: string;
   durationSeconds: number;
@@ -63,6 +63,11 @@ const activeElapsedSeconds = () =>
   state.activeSession
     ? Math.floor((Date.now() - new Date(state.activeSession.startedAt).getTime()) / 1000)
     : 0;
+const persistState = () => {
+  void saveState(state).catch((error: unknown) => {
+    console.error("Unable to save Snowball state", error);
+  });
+};
 
 const sphereProgress = (sphere: Sphere) => {
   if (sphere.dailyTargetMinutes <= 0) return 0;
@@ -522,7 +527,7 @@ const renderSessionOverlay = () => {
 const render = () => {
   const passiveGained = applyPassiveProduction(state);
   if (passiveGained > 1) lastReward = `+${round(passiveGained)} passive energy while away`;
-  saveState(state);
+  persistState();
 
   if (domainSpheres(state).length === 0) renderOnboarding();
   else renderHome();
@@ -571,7 +576,7 @@ app.addEventListener("submit", (event) => {
     editingRitualId = null;
   }
 
-  saveState(state);
+  persistState();
   render();
 });
 
@@ -580,7 +585,7 @@ app.addEventListener("change", async (event) => {
   if (input instanceof HTMLSelectElement && input.dataset.action === "route-connection") {
     const sphereId = input.dataset.sphereId;
     if (sphereId) routeConnectionToSphere(state, sphereId, input.value);
-    saveState(state);
+    persistState();
     render();
     return;
   }
@@ -595,7 +600,7 @@ app.addEventListener("change", async (event) => {
     const importedState = parseBackupState(await file.text());
     if (!confirm("Import this backup and replace current local Snowball data?")) return;
     state = importedState;
-    saveState(state);
+    persistState();
     lastReward = "Backup imported";
     lastCompletion = null;
     timerCompletedSessionId = null;
@@ -609,7 +614,7 @@ app.addEventListener("change", async (event) => {
   }
 });
 
-app.addEventListener("click", (event) => {
+app.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
 
@@ -655,7 +660,7 @@ app.addEventListener("click", (event) => {
     ) {
       archiveDomainSphere(state, sphereId);
       editingSphereId = null;
-      saveState(state);
+      persistState();
       render();
     }
   }
@@ -691,7 +696,7 @@ app.addEventListener("click", (event) => {
     if (confirm(`Archive ${ritual.name}? Past sessions will stay in history.`)) {
       archiveRitual(state, ritualId);
       editingRitualId = null;
-      saveState(state);
+      persistState();
       render();
     }
   }
@@ -699,21 +704,21 @@ app.addEventListener("click", (event) => {
   if (action === "level-sphere") {
     const sphereId = actionElement.dataset.sphereId;
     if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Sphere leveled up";
-    saveState(state);
+    persistState();
     render();
   }
 
   if (action === "toggle-connection") {
     const connectionId = actionElement.dataset.connectionId;
     if (connectionId) toggleConnection(state, connectionId);
-    saveState(state);
+    persistState();
     render();
   }
 
   if (action === "reverse-connection") {
     const connectionId = actionElement.dataset.connectionId;
     if (connectionId) reverseConnection(state, connectionId);
-    saveState(state);
+    persistState();
     render();
   }
 
@@ -721,7 +726,7 @@ app.addEventListener("click", (event) => {
     const sphereId = actionElement.dataset.sphereId;
     const ritualId = actionElement.dataset.ritualId;
     if (sphereId && ritualId) setActiveRitual(state, sphereId, ritualId);
-    saveState(state);
+    persistState();
     render();
   }
 
@@ -732,7 +737,7 @@ app.addEventListener("click", (event) => {
       lastReward = null;
       lastCompletion = null;
       timerCompletedSessionId = null;
-      saveState(state);
+      persistState();
       render();
     }
   }
@@ -766,13 +771,13 @@ app.addEventListener("click", (event) => {
       };
     }
     timerCompletedSessionId = null;
-    saveState(state);
+    persistState();
     render();
   }
 
   if (action === "reset" && confirm("Reset local Snowball data?")) {
-    resetState();
-    state = loadState();
+    await resetState();
+    state = await loadState();
     lastReward = null;
     lastCompletion = null;
     timerCompletedSessionId = null;

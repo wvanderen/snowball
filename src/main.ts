@@ -14,7 +14,7 @@ import {
   startSession,
   updateDomainSphere,
 } from "./game.ts";
-import { loadState, resetState, saveState } from "./storage.ts";
+import { createBackupJson, loadState, parseBackupState, resetState, saveState } from "./storage.ts";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let state: AppState = loadState();
@@ -35,6 +35,7 @@ let isCreatingSphere = false;
 let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
 
+const backupInputId = "backup-import-input";
 const round = (value: number) => Math.floor(value).toLocaleString();
 const formatSessionTime = (iso: string) =>
   new Intl.DateTimeFormat(undefined, {
@@ -194,7 +195,10 @@ const renderHome = () => {
           <strong>${round(state.game.experience)}</strong>
         </div>
         <button class="ghost" data-action="show-create-sphere">Add</button>
+        <button class="ghost" data-action="export-backup">Export</button>
+        <button class="ghost" data-action="import-backup">Import</button>
         <button class="ghost" data-action="reset">Reset</button>
+        <input id="${backupInputId}" class="visually-hidden" type="file" accept="application/json,.json" />
       </header>
 
       <section class="lattice-card">
@@ -400,6 +404,31 @@ app.addEventListener("submit", (event) => {
   render();
 });
 
+app.addEventListener("change", async (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || input.id !== backupInputId) return;
+
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file) return;
+
+  try {
+    const importedState = parseBackupState(await file.text());
+    if (!confirm("Import this backup and replace current local Snowball data?")) return;
+    state = importedState;
+    saveState(state);
+    lastReward = "Backup imported";
+    lastCompletion = null;
+    timerCompletedSessionId = null;
+    isCreatingSphere = false;
+    editingSphereId = null;
+    creatingRitualForSphereId = null;
+    render();
+  } catch {
+    alert("That file is not a valid Snowball backup.");
+  }
+});
+
 app.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -457,6 +486,20 @@ app.addEventListener("click", (event) => {
       saveState(state);
       render();
     }
+  }
+
+  if (action === "export-backup") {
+    const blob = new Blob([createBackupJson(state)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `snowball-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  if (action === "import-backup") {
+    document.querySelector<HTMLInputElement>(`#${backupInputId}`)?.click();
   }
 
   if (action === "finish-session") {

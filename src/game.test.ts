@@ -10,7 +10,7 @@ import {
   startSession,
   updateDomainSphere,
 } from "./game.ts";
-import { createInitialState, localDateKey } from "./storage.ts";
+import { createBackupJson, createInitialState, localDateKey, parseBackupState } from "./storage.ts";
 
 const setNow = (iso: string) => vi.setSystemTime(new Date(iso));
 
@@ -204,6 +204,23 @@ describe("core game calculations", () => {
     expect(sphere!.momentum).toBe(25);
 
     vi.useRealTimers();
+  });
+
+  it("exports and imports Snowball backup files", () => {
+    const state = createInitialState();
+    createDomainSphere(state, "Backup", "#38bdf8", 15);
+    state.game.energy = 42;
+
+    const restored = parseBackupState(createBackupJson(state));
+
+    expect(restored.game.energy).toBe(42);
+    expect(restored.spheres.some((sphere) => sphere.name === "Backup")).toBe(true);
+  });
+
+  it("rejects invalid backup files", () => {
+    expect(() =>
+      parseBackupState(JSON.stringify({ app: "snowball", state: { game: {} } })),
+    ).toThrow("Backup is missing required local data arrays.");
   });
 
   it("rolls completed days forward without penalizing momentum", () => {

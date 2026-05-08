@@ -14,6 +14,14 @@ const maxPassiveElapsedSeconds = 8 * 60 * 60;
 
 export const sphereLevelCost = (sphere: Sphere) => Math.floor(50 * sphere.level ** 1.65);
 
+export const sphereSlotCost = (state: AppState) => {
+  const activeSphereCount = domainSpheres(state).length;
+  if (activeSphereCount === 0) return 0;
+  return Math.floor(100 * activeSphereCount ** 1.75);
+};
+
+export const canUnlockSphereSlot = (state: AppState) => state.game.energy >= sphereSlotCost(state);
+
 export const sphereRates = (sphere: Sphere) => {
   const momentumMultiplier = 0.25 + sphere.momentum / 100;
   const passivePerHour = sphere.passiveEnergyRate * sphere.level * momentumMultiplier * 60 * 60;
@@ -102,6 +110,10 @@ export const createDomainSphere = (
   color: string,
   dailyTargetMinutes: number,
 ) => {
+  const slotCost = sphereSlotCost(state);
+  if (state.game.energy < slotCost) return null;
+
+  state.game.energy -= slotCost;
   const now = nowIso();
   const sphereId = createId("sphere");
   const ritualId = createId("ritual");
@@ -152,6 +164,7 @@ export const createDomainSphere = (
   state.spheres.push(sphere);
   state.rituals.push(ritual);
   state.connections.push(connection);
+  return sphere;
 };
 
 export const createFirstSphere = createDomainSphere;

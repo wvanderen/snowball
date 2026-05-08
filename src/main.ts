@@ -5,6 +5,7 @@ import {
   applyPassiveProduction,
   archiveDomainSphere,
   archiveRitual,
+  canUnlockSphereSlot,
   createDomainSphere,
   createRitual,
   domainSpheres,
@@ -17,6 +18,7 @@ import {
   setActiveRitual,
   sphereLevelCost,
   sphereRates,
+  sphereSlotCost,
   purchaseSphereLevel,
   startSession,
   updateDomainSphere,
@@ -165,11 +167,19 @@ const renderEditRitualForm = (ritualId: string) => {
   </section>`;
 };
 
-const renderSphereForm = (isFirstRun: boolean) => `
+const renderSphereForm = (isFirstRun: boolean) => {
+  const slotCost = sphereSlotCost(state);
+  const canUnlock = canUnlockSphereSlot(state);
+
+  return `
   <section class="intro-card">
     <p class="eyebrow">Snowball v0</p>
-    <h1>${isFirstRun ? "Start with one sphere." : "Add a sphere."}</h1>
-    <p class="lede">Pick a life domain you want to keep in motion. Tapping it will immediately start a focus session.</p>
+    <h1>${isFirstRun ? "Start with one sphere." : "Unlock a sphere slot."}</h1>
+    <p class="lede">${
+      isFirstRun
+        ? "Pick a life domain you want to keep in motion. Your first sphere is free."
+        : `A new lattice slot costs ${round(slotCost)} energy. Earn focus energy to grow deliberately.`
+    }</p>
     <form id="create-sphere-form" class="sphere-form">
       <label>
         Sphere name
@@ -188,10 +198,11 @@ const renderSphereForm = (isFirstRun: boolean) => `
       </label>
       <div class="form-actions">
         ${isFirstRun ? "" : `<button type="button" class="ghost" data-action="cancel-create-sphere">Cancel</button>`}
-        <button type="submit">Create sphere</button>
+        <button type="submit" ${canUnlock ? "" : "disabled"}>${isFirstRun ? "Create sphere" : `Unlock & create · ${round(slotCost)} energy`}</button>
       </div>
     </form>
   </section>`;
+};
 
 const renderOnboarding = () => {
   app.innerHTML = `
@@ -200,12 +211,12 @@ const renderOnboarding = () => {
     </main>`;
 };
 
-const renderSphere = (sphere: Sphere, index: number, spheres: Sphere[]) => {
+const renderSphere = (sphere: Sphere, index: number, totalSlots: number) => {
   const progress = sphereProgress(sphere);
   const ritual = getRitual(state, sphere.activeRitualId);
   const isActive = state.activeSession?.sphereId === sphere.id;
   const completion = lastCompletion?.sphereId === sphere.id ? lastCompletion : null;
-  const position = spherePosition(index, spheres.length);
+  const position = spherePosition(index, totalSlots);
 
   const visualState = sphereVisualState(sphere);
   const momentum = Math.round(sphere.momentum);
@@ -224,10 +235,10 @@ const renderSphere = (sphere: Sphere, index: number, spheres: Sphere[]) => {
     </button>`;
 };
 
-const renderConnectionLines = (spheres: Sphere[]) =>
+const renderConnectionLines = (spheres: Sphere[], totalSlots: number) =>
   spheres
     .map((sphere, index) => {
-      const position = spherePosition(index, spheres.length);
+      const position = spherePosition(index, totalSlots);
       const isActive = state.activeSession?.sphereId === sphere.id;
       const completed = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
       const progress = sphereProgress(sphere);
@@ -243,6 +254,9 @@ const renderConnectionLines = (spheres: Sphere[]) =>
 const renderHome = () => {
   ensureToday(state);
   const spheres = domainSpheres(state);
+  const nextSlotCost = sphereSlotCost(state);
+  const canUnlockSlot = canUnlockSphereSlot(state);
+  const visibleLatticeSlots = spheres.length + 1;
 
   app.innerHTML = `
     <main class="app-shell">
@@ -259,7 +273,7 @@ const renderHome = () => {
           <p class="eyebrow">Passive</p>
           <strong>${round(spheres.reduce((sum, sphere) => sum + sphereRates(sphere).passivePerHour, 0))}/h</strong>
         </div>
-        <button class="ghost" data-action="show-create-sphere">Add</button>
+        <button class="ghost" data-action="show-create-sphere" ${canUnlockSlot ? "" : "disabled"}>${canUnlockSlot ? "Add" : `Locked · ${round(nextSlotCost)} energy`}</button>
         <button class="ghost" data-action="export-backup">Export</button>
         <button class="ghost" data-action="import-backup">Import</button>
         <button class="ghost" data-action="reset">Reset</button>
@@ -269,7 +283,7 @@ const renderHome = () => {
       <section class="lattice-card">
         <div class="lattice">
           <svg class="connection-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            ${renderConnectionLines(spheres)}
+            ${renderConnectionLines(spheres, visibleLatticeSlots)}
           </svg>
           <div class="sphere center-sphere">
             <span class="sphere-core">
@@ -277,14 +291,15 @@ const renderHome = () => {
               <span class="sphere-meta">output</span>
             </span>
           </div>
-          ${spheres.map(renderSphere).join("")}
+          ${spheres.map((sphere, index) => renderSphere(sphere, index, visibleLatticeSlots)).join("")}
+          ${renderLockedSphereSlot(spheres.length, visibleLatticeSlots, nextSlotCost)}
         </div>
       </section>
 
       <section class="sphere-list">
         ${spheres.map(renderSphereStats).join("")}
       </section>
-      <p class="tap-hint">Tap any sphere to start immediately. Partial sessions count; milestone blooms trigger when the full daily target is reached.</p>
+      <p class="tap-hint">Tap any sphere to start immediately. New lattice slots unlock with energy; next slot costs ${round(nextSlotCost)} energy.</p>
       ${renderSessionHistory()}
 
       ${isCreatingSphere ? `<div class="modal-scrim">${renderSphereForm(false)}</div>` : ""}
@@ -294,6 +309,17 @@ const renderHome = () => {
       ${state.activeSession ? renderSessionOverlay() : ""}
       ${lastCompletion ? renderCompletionFeedback(lastCompletion) : lastReward ? `<aside class="toast">${lastReward}</aside>` : ""}
     </main>`;
+};
+
+const renderLockedSphereSlot = (index: number, total: number, cost: number) => {
+  const position = spherePosition(index, total);
+  return `
+    <button class="sphere domain-sphere locked-sphere" data-action="show-create-sphere" aria-label="Locked sphere slot. Unlock costs ${round(cost)} energy" style="--sphere-color: #94a3b8; --progress: 0%; --momentum: 0; --sphere-x: ${position.x}%; --sphere-y: ${position.y}%">
+      <span class="sphere-core">
+        <span class="sphere-name">Locked</span>
+        <span class="sphere-meta">${round(cost)} energy</span>
+      </span>
+    </button>`;
 };
 
 const renderRitualHotbar = (sphere: Sphere) => {
@@ -481,8 +507,13 @@ app.addEventListener("submit", (event) => {
   if (form.id === "create-sphere-form") {
     const rawColor = data.get("color");
     const color = typeof rawColor === "string" ? rawColor : "#7dd3fc";
-    createDomainSphere(state, name, color, target ?? 20);
-    isCreatingSphere = false;
+    if (createDomainSphere(state, name, color, target ?? 20)) {
+      lastReward =
+        domainSpheres(state).length === 1 ? "First sphere created" : "Sphere slot unlocked";
+      isCreatingSphere = false;
+    } else {
+      lastReward = `Need ${round(sphereSlotCost(state))} energy to unlock the next sphere slot`;
+    }
   }
 
   if (form.id === "edit-sphere-form") {

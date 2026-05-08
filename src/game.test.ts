@@ -14,6 +14,7 @@ import {
   recentSessionsForRitual,
   setActiveRitual,
   sphereLevelCost,
+  sphereSlotCost,
   startSession,
   updateDomainSphere,
   updateRitual,
@@ -197,6 +198,24 @@ describe("core game calculations", () => {
     expect(sphere.level).toBe(2);
     expect(state.game.energy).toBe(150);
     expect(sphereLevelCost(sphere)).toBeGreaterThan(50);
+  });
+
+  it("gates additional sphere slots behind escalating energy costs while first sphere is free", () => {
+    const state = createInitialState();
+
+    expect(sphereSlotCost(state)).toBe(0);
+    expect(createDomainSphere(state, "Study", "#38bdf8", 20)).not.toBeNull();
+    expect(state.game.energy).toBe(0);
+
+    const secondSlotCost = sphereSlotCost(state);
+    expect(secondSlotCost).toBe(100);
+    expect(createDomainSphere(state, "Health", "#22c55e", 30)).toBeNull();
+    expect(domainSpheres(state)).toHaveLength(1);
+
+    state.game.energy = secondSlotCost;
+    expect(createDomainSphere(state, "Health", "#22c55e", 30)).not.toBeNull();
+    expect(state.game.energy).toBe(0);
+    expect(sphereSlotCost(state)).toBeGreaterThan(secondSlotCost);
   });
 
   it("mutates spheres and rituals and uses the active ritual id without changing sphere timer target", () => {

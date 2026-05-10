@@ -1346,8 +1346,18 @@ input[type="color"] {
     padding-right: var(--space-2);
   }
 
+  .home-grid {
+    height: calc(100svh - 104px);
+    min-height: 620px;
+  }
+
   .sigil-stage {
-    min-height: calc(100svh - 132px);
+    height: 100%;
+    min-height: 0;
+  }
+
+  .focus-panel {
+    overflow-y: auto;
   }
 }
 

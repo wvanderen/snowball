@@ -234,6 +234,7 @@ const renderSigil = (spheres: Sphere[]) => {
       </button>
       ${spheres.map((sphere, index) => renderDomainSphere(sphere, index, totalSlots)).join("")}
       ${spheres.length < 10 && canUnlockSlot ? renderLockedSlot(spheres.length, totalSlots, nextSlotCost) : ""}
+      ${state.activeSession ? renderSessionDock() : lastCompletion ? renderCompletionFeedback(lastCompletion) : ""}
     </section>`;
 };
 
@@ -347,7 +348,7 @@ const renderSessionHistoryItem = (session: Session) => {
 };
 
 const renderModalLayers = () =>
-  `${isCreatingSphere ? `<div class="modal-scrim">${renderCreateOrEditSphereForm(null)}</div>` : ""}${renderEditSphereModal()}${renderRitualModal()}${renderEditRitualModal()}${state.activeSession ? renderSessionOverlay() : ""}${lastCompletion ? renderCompletionFeedback(lastCompletion) : lastReward ? `<aside class="toast" role="status">${lastReward}</aside>` : ""}`;
+  `${isCreatingSphere ? `<div class="modal-scrim">${renderCreateOrEditSphereForm(null)}</div>` : ""}${renderEditSphereModal()}${renderRitualModal()}${renderEditRitualModal()}${lastReward ? `<aside class="toast" role="status">${lastReward}</aside>` : ""}`;
 
 const renderEditSphereModal = () => {
   if (!editingSphereId) return "";
@@ -364,14 +365,18 @@ const renderRitualModal = () => {
 const renderEditRitualModal = () =>
   editingRitualId ? `<div class="modal-scrim">${renderEditRitualForm(editingRitualId)}</div>` : "";
 
-const renderCompletionFeedback = (feedback: CompletionFeedback) => `
-  <aside class="completion-toast ${feedback.completedMilestone ? "is-bloom" : ""}" role="status" aria-live="polite">
-    <p class="kicker">${feedback.completedMilestone ? "Bloom resolved" : "Session resolved"}</p>
-    <strong>${formatDuration(feedback.durationSeconds)} logged</strong>
+const renderCompletionFeedback = (feedback: CompletionFeedback) => {
+  const sphere = state.spheres.find((item) => item.id === feedback.sphereId);
+  return `
+  <aside class="session-sheet completion-toast ${feedback.completedMilestone ? "is-bloom" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: 100%" role="status" aria-live="polite">
+    <div class="session-orb" aria-hidden="true"><span></span></div>
+    <div class="session-copy"><p class="kicker">${feedback.completedMilestone ? "Bloom resolved" : "Session logged"}</p><h2>${formatDuration(feedback.durationSeconds)}</h2><p>${sphere?.name ?? "Session"}</p></div>
     <div class="reward-grid"><span>XP <b>+${Math.floor(feedback.xpGained)}</b></span><span>Energy <b>+${round(feedback.energyGained)}</b></span>${feedback.completedMilestone ? `<span>Bloom <b>+${round(feedback.milestoneEnergy)}</b></span>` : ""}</div>
+    <button class="quiet" data-action="dismiss-completion">Done</button>
   </aside>`;
+};
 
-const renderSessionOverlay = () => {
+const renderSessionDock = () => {
   const active = state.activeSession;
   if (!active) return "";
   const sphere = state.spheres.find((item) => item.id === active.sphereId);
@@ -383,10 +388,10 @@ const renderSessionOverlay = () => {
   const displaySeconds = targetSeconds ? Math.max(0, targetSeconds - elapsed) : elapsed;
   const progress = targetSeconds ? clamp((elapsed / targetSeconds) * 100, 0, 100) : 100;
   return `
-    <section class="session-sheet ${targetComplete ? "target-complete" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: ${progress}%" role="dialog" aria-labelledby="session-title">
+    <section class="session-sheet ${targetComplete ? "target-complete" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: ${progress}%" aria-labelledby="session-title">
       <div class="session-orb" aria-hidden="true"><span></span></div>
-      <p class="kicker">Active ritual</p><h2 id="session-title">${sphere?.name ?? "Session"}</h2><p>${ritual?.name ?? "Focus"}</p>
-      <div class="timer">${formatDuration(displaySeconds)}</div><p class="timer-mode">${targetComplete ? "Target complete, ready to resolve" : targetSeconds ? "Counting down to ritual target" : "Counting up real focus"}</p>
+      <div class="session-copy"><p class="kicker">Active ritual</p><h2 id="session-title">${sphere?.name ?? "Session"}</h2><p>${ritual?.name ?? "Focus"}</p></div>
+      <div class="session-time"><div class="timer">${formatDuration(displaySeconds)}</div><p class="timer-mode">${targetComplete ? "Target complete" : targetSeconds ? "Counting down" : "Counting up"}</p></div>
       ${targetComplete ? `<div class="timer-complete-alert" role="status" aria-live="assertive">Bloom window reached. Log when you are done.</div>` : ""}
       <button data-action="finish-session">${targetComplete ? "Resolve ritual" : "Stop and log"}</button>
     </section>`;
@@ -622,6 +627,10 @@ app.addEventListener("click", async (event) => {
       persistState();
       render();
     }
+  }
+  if (action === "dismiss-completion") {
+    lastCompletion = null;
+    render();
   }
   if (action === "export-backup") {
     const blob = new Blob([createBackupJson(state)], { type: "application/json" });

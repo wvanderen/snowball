@@ -821,34 +821,45 @@ input[type="color"] {
 }
 
 .session-sheet {
-  position: fixed;
-  inset: auto var(--space-3) max(var(--space-3), env(safe-area-inset-bottom));
-  z-index: 40;
+  position: absolute;
+  right: clamp(18px, 4vw, 54px);
+  bottom: clamp(18px, 4vw, 42px);
+  left: clamp(18px, 4vw, 54px);
+  z-index: 8;
   display: grid;
-  gap: var(--space-2);
-  width: min(520px, calc(100% - var(--space-6)));
-  margin: 0 auto;
-  border-radius: 34px;
-  padding: var(--space-5);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  border-radius: 28px;
+  padding: var(--space-3);
   background:
-    radial-gradient(
-      circle at 18% 24%,
-      color-mix(in srgb, var(--sphere-color), transparent 65%),
-      transparent 12rem
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sphere-color), transparent 82%),
+      transparent 38%
     ),
-    var(--panel-strong);
-  text-align: center;
+    oklch(10% 0.035 278 / 0.82);
+  text-align: left;
+  backdrop-filter: blur(14px);
+}
+.session-sheet::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 68%);
+  border-radius: inherit;
+  pointer-events: none;
+  mask-image: linear-gradient(90deg, black, transparent 82%);
 }
 .session-orb {
-  justify-self: center;
-  width: 96px;
-  height: 96px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
   background: conic-gradient(
     color-mix(in srgb, var(--sphere-color), white 8%) var(--progress),
     oklch(28% 0.04 278 / 0.5) 0
   );
-  padding: 9px;
+  padding: 6px;
 }
 .session-orb span {
   display: block;
@@ -861,12 +872,18 @@ input[type="color"] {
     color-mix(in srgb, var(--sphere-color), black 45%)
   );
 }
+.session-copy h2 {
+  font-size: 1.35rem;
+}
+.session-time {
+  text-align: right;
+}
 .timer {
   color: var(--ink-0);
-  font-size: 4rem;
+  font-size: clamp(2.15rem, 5.2vw, 3.75rem);
   font-weight: 900;
   letter-spacing: -0.08em;
-  line-height: 1;
+  line-height: 0.9;
   font-variant-numeric: tabular-nums;
 }
 .timer-mode,
@@ -874,7 +891,13 @@ input[type="color"] {
   margin: 0;
   color: var(--ink-2);
 }
+.session-sheet button {
+  grid-column: 1 / -1;
+  position: relative;
+  z-index: 1;
+}
 .timer-complete-alert {
+  grid-column: 1 / -1;
   border: 1px solid oklch(80% 0.13 160 / 0.36);
   border-radius: 18px;
   padding: var(--space-3);
@@ -882,7 +905,6 @@ input[type="color"] {
   background: oklch(25% 0.08 160 / 0.18);
 }
 
-.completion-toast,
 .toast {
   position: fixed;
   right: var(--space-4);
@@ -894,27 +916,22 @@ input[type="color"] {
   background: var(--panel-strong);
 }
 .completion-toast.is-bloom {
-  border-color: oklch(82% 0.13 78 / 0.42);
-  box-shadow:
-    0 0 48px oklch(82% 0.13 78 / 0.16),
-    0 24px 80px var(--shadow);
+  box-shadow: 0 0 48px oklch(82% 0.13 78 / 0.16);
 }
-.completion-toast strong {
-  display: block;
-  color: var(--ink-0);
-  font-size: 1.45rem;
+.completion-toast .reward-grid {
+  justify-self: end;
 }
 .reward-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(72px, 1fr));
   gap: var(--space-2);
-  margin-top: var(--space-3);
 }
 .reward-grid span {
-  padding: var(--space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: 16px;
   background: oklch(12% 0.04 278 / 0.75);
   color: var(--ink-2);
+  font-size: 0.78rem;
 }
 .reward-grid b {
   display: block;
@@ -1456,5 +1473,20 @@ input[type="color"] {
 
   .focus-panel {
     border-radius: 22px;
+  }
+
+  .session-sheet {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .session-time,
+  .completion-toast .reward-grid {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    text-align: left;
+  }
+
+  .reward-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

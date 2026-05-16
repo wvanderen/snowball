@@ -14,14 +14,13 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
-  purchaseSphereLevel,
   recentSessionsForRitual,
   reverseConnection,
   routedSphereRates,
   routeConnectionToSphere,
   setActiveRitual,
-  sphereLevelCost,
   sphereSlotCost,
+  spendSpherePoint,
   startSession,
   toggleConnection,
   unequipGlyph,
@@ -254,8 +253,17 @@ describe("core game calculations", () => {
 
     startSession(state, first.id);
 
-    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.25);
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.2);
     expect(connectedSphereBuffMultiplier(state, first.id)).toBe(1);
+
+    first.xp = 45;
+    expect(spendSpherePoint(state, first.id, "Flow")).toBe(true);
+    expect(spendSpherePoint(state, first.id, "Flow")).toBe(true);
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.25);
+
+    first.xp = 100;
+    expect(spendSpherePoint(state, first.id, "Flow")).toBe(true);
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBe(1.4);
 
     const connection = connectionForSphere(state, first.id)!;
     reverseConnection(state, connection.id);
@@ -281,10 +289,15 @@ describe("core game calculations", () => {
     const baseActive = routedSphereRates(state, sphere).activePerMinute;
     expect(baseActive).toBeCloseTo(8.505);
 
-    state.game.energy = 500;
-    sphere.level = 3;
-    expect(purchaseSphereLevel(state, sphere.id)).toBe(true);
-    expect(sphere.glyphSlotCount).toBe(2);
+    sphere.xp = 45;
+    state.activeSession = {
+      id: "session_slot",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-08T11:59:00.000Z",
+    };
+    finishActiveSession(state);
+    sphere.glyphSlotCount = 2;
     expect(equipGlyph(state, "glyph_deep_work", sphere.id)).toBe(true);
     expect(unequipGlyph(state, "glyph_streak")).toBe(true);
     expect(equippedGlyphsForSphere(state, sphere.id).map((glyph) => glyph.effect)).toEqual([
@@ -298,7 +311,7 @@ describe("core game calculations", () => {
       startedAt: "2026-05-08T11:30:00.000Z",
     };
     const result = finishActiveSession(state)!;
-    expect(result.activeEnergy).toBeCloseTo(1339.2);
+    expect(result.activeEnergy).toBeCloseTo(1017.36);
 
     vi.useRealTimers();
   });
@@ -320,19 +333,116 @@ describe("core game calculations", () => {
     expect(target.equippedGlyphIds).toEqual(["glyph_deep_work"]);
   });
 
-  it("purchases sphere levels with spendable energy and increasing costs", () => {
+  it("levels domain spheres from XP and grants sphere-specific path points", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
     const state = createInitialState();
-    createDomainSphere(state, "Study", "#38bdf8", 20);
-    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    const sphere = createDomainSphere(state, "Study", "#38bdf8", 20)!;
 
-    expect(sphereLevelCost(sphere)).toBe(50);
-    expect(purchaseSphereLevel(state, sphere.id)).toBe(false);
+    state.activeSession = {
+      id: "session_level",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-08T11:45:00.000Z",
+    };
 
-    state.game.energy = 200;
-    expect(purchaseSphereLevel(state, sphere.id)).toBe(true);
+    const result = finishActiveSession(state)!;
+
+    expect(result.xpGained).toBe(15);
+    expect(sphere.xp).toBe(15);
     expect(sphere.level).toBe(2);
-    expect(state.game.energy).toBe(150);
-    expect(sphereLevelCost(sphere)).toBeGreaterThan(50);
+    expect(sphere.availablePoints).toBe(1);
+    expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
+    expect(sphere.availablePoints).toBe(0);
+    expect(sphere.pathAllocations).toEqual([{ path: "Flow", rank: 1 }]);
+    expect(routedSphereRates(state, sphere).activePerMinute).toBeGreaterThan(16.2);
+
+    vi.useRealTimers();
+  });
+
+  it("applies return momentum only after 24 hours of inactivity", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-09T00:10:00.000Z");
+    const state = createInitialState();
+    const sphere = createDomainSphere(state, "Study", "#38bdf8", 60)!;
+    sphere.xp = 100;
+    expect(spendSpherePoint(state, sphere.id, "Anchor")).toBe(true);
+    expect(spendSpherePoint(state, sphere.id, "Anchor")).toBe(true);
+    expect(spendSpherePoint(state, sphere.id, "Anchor")).toBe(true);
+    sphere.momentum = 10;
+    sphere.lastSessionAt = "2026-05-08T23:50:00.000Z";
+    state.activeSession = {
+      id: "session_cross_midnight",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-09T00:05:00.000Z",
+    };
+
+    const recentReturn = finishActiveSession(state)!;
+
+    expect(recentReturn.momentumAfter).toBe(15);
+
+    setNow("2026-05-10T00:20:00.000Z");
+    sphere.momentum = 10;
+    sphere.todaySeconds = 0;
+    sphere.dailyProgressDate = localDateKey();
+    sphere.lastSessionAt = "2026-05-09T00:10:00.000Z";
+    state.activeSession = {
+      id: "session_after_inactivity",
+      sphereId: sphere.id,
+      ritualId: sphere.activeRitualId,
+      startedAt: "2026-05-10T00:15:00.000Z",
+    };
+
+    const inactiveReturn = finishActiveSession(state)!;
+
+    expect(inactiveReturn.momentumAfter).toBe(25);
+
+    vi.useRealTimers();
+  });
+
+  it("applies bloom spillover and release glyph effects", () => {
+    vi.useFakeTimers();
+    setNow("2026-05-08T12:00:00.000Z");
+    const state = createInitialState();
+    const source = createDomainSphere(state, "Study", "#38bdf8", 20)!;
+    state.game.energy = 500;
+    const neighbor = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    routeConnectionToSphere(state, source.id, neighbor.id);
+
+    source.xp = 45;
+    expect(spendSpherePoint(state, source.id, "Bloom")).toBe(true);
+    expect(spendSpherePoint(state, source.id, "Bloom")).toBe(true);
+    state.activeSession = {
+      id: "session_bloom_spillover",
+      sphereId: source.id,
+      ritualId: source.activeRitualId,
+      startedAt: "2026-05-08T11:40:00.000Z",
+    };
+
+    const bloomResult = finishActiveSession(state)!;
+    expect(bloomResult.milestoneEnergy).toBeCloseTo(44);
+    expect(
+      bloomResult.energyGained - bloomResult.activeEnergy - bloomResult.milestoneEnergy,
+    ).toBeCloseTo(2.2);
+
+    source.charge = 80;
+    expect(equipGlyph(state, "glyph_release", source.id)).toBe(true);
+    setNow("2026-05-08T12:10:00.000Z");
+    state.activeSession = {
+      id: "session_release_glyph",
+      sphereId: source.id,
+      ritualId: source.activeRitualId,
+      startedAt: "2026-05-08T12:05:00.000Z",
+    };
+
+    const releaseResult = finishActiveSession(state)!;
+    expect(
+      releaseResult.energyGained - releaseResult.activeEnergy - releaseResult.milestoneEnergy,
+    ).toBeCloseTo(20);
+    expect(source.charge).toBeCloseTo(60);
+
+    vi.useRealTimers();
   });
 
   it("gates additional sphere slots behind escalating energy costs while first sphere is free", () => {
@@ -509,6 +619,30 @@ describe("core game calculations", () => {
 
     expect(restored.game.energy).toBe(42);
     expect(restored.spheres.some((sphere) => sphere.name === "Backup")).toBe(true);
+  });
+
+  it("adds missing starter glyphs when importing older saved states", () => {
+    const state = createInitialState();
+    const backup = JSON.parse(createBackupJson(state)) as {
+      state: ReturnType<typeof createInitialState>;
+    };
+    backup.state.glyphs = backup.state.glyphs.filter((glyph) =>
+      ["glyph_streak", "glyph_recent_consistency", "glyph_deep_work"].includes(glyph.id),
+    );
+
+    const restored = parseBackupState(JSON.stringify(backup));
+
+    expect(restored.glyphs.map((glyph) => glyph.id)).toEqual(
+      expect.arrayContaining([
+        "glyph_streak",
+        "glyph_amplify",
+        "glyph_store",
+        "glyph_release",
+        "glyph_bloom",
+        "glyph_echo",
+        "glyph_kindle",
+      ]),
+    );
   });
 
   it("rejects invalid backup files", () => {

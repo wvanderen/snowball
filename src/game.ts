@@ -2,7 +2,10 @@ import {
   type AppState,
   type Connection,
   type GlyphEffect,
+  type ModifierEffect,
   type Ritual,
+  type SpherePath,
+  type TalentDefinition,
   type Session,
   type Sphere,
   centerSphereId,
@@ -12,9 +15,197 @@ import { createId, localDateKey } from "./storage.ts";
 const secondsPerMinute = 60;
 const millisecondsPerDay = 24 * 60 * 60 * 1000;
 const maxPassiveElapsedSeconds = 8 * 60 * 60;
+const inactivityReturnThresholdMs = millisecondsPerDay;
+const baseMaxCharge = 100;
+
+const xpLevelThresholds = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500] as const;
+export const spherePaths: SpherePath[] = ["Flow", "Charge", "Bloom", "Anchor"];
+
+export const talentDefinitions: TalentDefinition[] = [
+  {
+    id: "flow_1",
+    path: "Flow",
+    rank: 1,
+    name: "Smooth Current",
+    description: "Outgoing Energy from this sphere +5%.",
+    effects: [{ type: "MULTIPLY_OUTGOING_ENERGY", value: 0.05 }],
+  },
+  {
+    id: "flow_2",
+    path: "Flow",
+    rank: 2,
+    name: "Open Channel",
+    description: "Routing loss from this sphere reduced by 5%.",
+    effects: [{ type: "REDUCE_ROUTING_LOSS", value: 0.05 }],
+  },
+  {
+    id: "flow_3",
+    path: "Flow",
+    rank: 3,
+    name: "Live Conduit",
+    description: "While this sphere is active, connected edges gain +15% throughput.",
+    effects: [{ type: "ACTIVE_EDGE_THROUGHPUT_BONUS", value: 0.15 }],
+  },
+  {
+    id: "charge_1",
+    path: "Charge",
+    rank: 1,
+    name: "Vessel",
+    description: "Store 5% of incoming Energy as Charge.",
+    effects: [{ type: "STORE_INCOMING_ENERGY_AS_CHARGE", value: 0.05 }],
+  },
+  {
+    id: "charge_2",
+    path: "Charge",
+    rank: 2,
+    name: "Deeper Vessel",
+    description: "Max Charge +50%.",
+    effects: [{ type: "MULTIPLY_MAX_CHARGE", value: 0.5 }],
+  },
+  {
+    id: "charge_3",
+    path: "Charge",
+    rank: 3,
+    name: "Release",
+    description: "Daily Bloom releases stored Charge toward Center.",
+    effects: [{ type: "RELEASE_CHARGE_ON_MILESTONE", value: 1 }],
+  },
+  {
+    id: "bloom_1",
+    path: "Bloom",
+    rank: 1,
+    name: "First Petal",
+    description: "Milestone Bloom Energy +10%.",
+    effects: [{ type: "MULTIPLY_MILESTONE_BLOOM", value: 0.1 }],
+  },
+  {
+    id: "bloom_2",
+    path: "Bloom",
+    rank: 2,
+    name: "Spillover",
+    description: "Blooms feed connected spheres with 5% of Bloom Energy.",
+    effects: [{ type: "BLOOM_NEIGHBOR_ENERGY_SHARE", value: 0.05 }],
+  },
+  {
+    id: "bloom_3",
+    path: "Bloom",
+    rank: 3,
+    name: "Partial Bloom",
+    description: "The first session of the day grants a small Bloom.",
+    effects: [{ type: "FIRST_SESSION_MINI_BLOOM", value: 0.15 }],
+  },
+  {
+    id: "anchor_1",
+    path: "Anchor",
+    rank: 1,
+    name: "Weight",
+    description: "Momentum decay for this sphere reduced by 5%.",
+    effects: [{ type: "REDUCE_MOMENTUM_DECAY", value: 0.05 }],
+  },
+  {
+    id: "anchor_2",
+    path: "Anchor",
+    rank: 2,
+    name: "Root",
+    description: "Minimum Momentum for this sphere +5.",
+    effects: [{ type: "INCREASE_MOMENTUM_FLOOR", value: 5 }],
+  },
+  {
+    id: "anchor_3",
+    path: "Anchor",
+    rank: 3,
+    name: "Return Path",
+    description: "First session after inactivity grants +10 Momentum.",
+    effects: [{ type: "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS", value: 10 }],
+  },
+];
+
+export const levelForXp = (xp: number) => {
+  let level = 1;
+  for (let index = 0; index < xpLevelThresholds.length; index += 1) {
+    if (xp >= xpLevelThresholds[index]!) level = index + 1;
+  }
+  return level;
+};
 
 export const sphereLevelCost = (sphere: Sphere) =>
-  Math.floor((sphere.kind === "center" ? 120 : 50) * sphere.level ** 1.65);
+  sphere.kind === "center" ? Math.floor(120 * sphere.level ** 1.65) : Number.POSITIVE_INFINITY;
+
+const sumEffects = (effects: ModifierEffect[], type: ModifierEffect["type"]) =>
+  effects.reduce((total, effect) => total + (effect.type === type ? effect.value : 0), 0);
+
+export const pathRank = (sphere: Sphere, path: SpherePath) =>
+  sphere.pathAllocations.find((allocation) => allocation.path === path)?.rank ?? 0;
+
+export const effectsForSphere = (state: AppState, sphere: Sphere): ModifierEffect[] => {
+  const pathEffects = sphere.pathAllocations.flatMap((allocation) =>
+    talentDefinitions
+      .filter((talent) => talent.path === allocation.path && talent.rank <= allocation.rank)
+      .flatMap((talent) => talent.effects),
+  );
+  const glyphEffects: ModifierEffect[] = equippedGlyphsForSphere(state, sphere.id).flatMap(
+    (glyph): ModifierEffect[] => {
+      if (glyph.effect === "amplify") return [{ type: "MULTIPLY_OUTGOING_ENERGY", value: 0.1 }];
+      if (glyph.effect === "store")
+        return [{ type: "STORE_INCOMING_ENERGY_AS_CHARGE", value: 0.05 }];
+      if (glyph.effect === "release")
+        return [{ type: "RELEASE_CHARGE_ON_SESSION_END", value: 0.25 }];
+      if (glyph.effect === "bloom") return [{ type: "MULTIPLY_MILESTONE_BLOOM", value: 0.2 }];
+      if (glyph.effect === "echo") return [{ type: "BLOOM_NEIGHBOR_ENERGY_SHARE", value: 0.1 }];
+      if (glyph.effect === "kindle")
+        return [{ type: "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS", value: 8 }];
+      return [];
+    },
+  );
+  return [...pathEffects, ...glyphEffects];
+};
+
+export const maxChargeForSphere = (state: AppState, sphere: Sphere) =>
+  baseMaxCharge * (1 + sumEffects(effectsForSphere(state, sphere), "MULTIPLY_MAX_CHARGE"));
+
+const recalculateSphereProgression = (sphere: Sphere) => {
+  if (sphere.kind !== "domain") return;
+  sphere.level = levelForXp(sphere.xp);
+  sphere.spentPoints = sphere.pathAllocations.reduce(
+    (total, allocation) => total + allocation.rank,
+    0,
+  );
+  sphere.availablePoints = Math.max(0, sphere.level - 1 - sphere.spentPoints);
+};
+
+export const spendSpherePoint = (state: AppState, sphereId: string, path: SpherePath) => {
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!sphere || !spherePaths.includes(path)) return false;
+  recalculateSphereProgression(sphere);
+  const currentRank = pathRank(sphere, path);
+  if (currentRank >= 3 || sphere.availablePoints <= 0) return false;
+  const allocation = sphere.pathAllocations.find((item) => item.path === path);
+  if (allocation) allocation.rank += 1;
+  else sphere.pathAllocations.push({ path, rank: 1 });
+  recalculateSphereProgression(sphere);
+  sphere.charge = Math.min(sphere.charge, maxChargeForSphere(state, sphere));
+  sphere.updatedAt = nowIso();
+  return true;
+};
+
+export const respecSphere = (state: AppState, sphereId: string) => {
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!sphere) return false;
+  recalculateSphereProgression(sphere);
+  const cost = sphere.firstRespecUsed ? 25 * sphere.spentPoints : 0;
+  if (state.game.energy < cost) return false;
+  state.game.energy -= cost;
+  sphere.pathAllocations = [];
+  sphere.firstRespecUsed = true;
+  sphere.charge = Math.min(sphere.charge, baseMaxCharge);
+  recalculateSphereProgression(sphere);
+  sphere.updatedAt = nowIso();
+  return true;
+};
 
 export const centerRecoveryMultiplier = (state: AppState) => {
   const center = state.spheres.find((sphere) => sphere.id === centerSphereId);
@@ -84,12 +275,22 @@ export const sphereSlotCost = (state: AppState) => {
 
 export const canUnlockSphereSlot = (state: AppState) => state.game.energy >= sphereSlotCost(state);
 
-export const sphereRates = (sphere: Sphere, buffMultiplier = 1) => {
+export const sphereRates = (sphere: Sphere, buffMultiplier = 1, outputMultiplier = 1) => {
   const momentumMultiplier = 0.25 + sphere.momentum / 100;
   const passivePerHour =
-    sphere.passiveEnergyRate * sphere.level * momentumMultiplier * buffMultiplier * 60 * 60;
+    sphere.passiveEnergyRate *
+    sphere.level *
+    momentumMultiplier *
+    buffMultiplier *
+    outputMultiplier *
+    60 *
+    60;
   const activePerMinute =
-    (1 + sphere.momentum / 100) * sphere.level * sphere.activeEnergyMultiplier * buffMultiplier;
+    (1 + sphere.momentum / 100) *
+    sphere.level *
+    sphere.activeEnergyMultiplier *
+    buffMultiplier *
+    outputMultiplier;
   return { passivePerHour, activePerMinute };
 };
 
@@ -104,7 +305,14 @@ export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string)
       connection.toSphereId === sphereId,
   );
   if (!hasActiveRoute) return 1;
-  return hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25;
+  const activeSphere = state.spheres.find((sphere) => sphere.id === activeSphereId);
+  const effects = activeSphere ? effectsForSphere(state, activeSphere) : [];
+  const conduitBonus = sumEffects(effects, "ACTIVE_EDGE_THROUGHPUT_BONUS");
+  const baseLoss = sphereId === centerSphereId ? 0 : 0.05;
+  const reducedLoss = Math.max(0, baseLoss - sumEffects(effects, "REDUCE_ROUTING_LOSS"));
+  return (
+    (hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25) + conduitBonus - reducedLoss
+  );
 };
 
 export const glyphRateMultiplier = (state: AppState, sphere: Sphere) => {
@@ -121,11 +329,14 @@ export const glyphRateMultiplier = (state: AppState, sphere: Sphere) => {
   return multiplier;
 };
 
-export const routedSphereRates = (state: AppState, sphere: Sphere) =>
-  sphereRates(
+export const routedSphereRates = (state: AppState, sphere: Sphere) => {
+  const effects = effectsForSphere(state, sphere);
+  return sphereRates(
     sphere,
     connectedSphereBuffMultiplier(state, sphere.id) * glyphRateMultiplier(state, sphere),
+    1 + sumEffects(effects, "MULTIPLY_OUTGOING_ENERGY"),
   );
+};
 
 export const momentumModel = {
   partialMissDecay: 3,
@@ -158,7 +369,9 @@ const missedMomentumDecay = (state: AppState, sphere: Sphere, today: string) => 
   const glyphAdjusted = hasGlyphEffect(state, sphere.id, "recovery")
     ? Math.floor(baseDecay * 0.7)
     : baseDecay;
-  return Math.floor(glyphAdjusted / centerRecoveryMultiplier(state));
+  const anchorAdjusted =
+    glyphAdjusted * (1 - sumEffects(effectsForSphere(state, sphere), "REDUCE_MOMENTUM_DECAY"));
+  return Math.floor(anchorAdjusted / centerRecoveryMultiplier(state));
 };
 
 export const domainSpheres = (state: AppState) =>
@@ -178,7 +391,8 @@ export const ensureToday = (state: AppState) => {
       const decay = missedMomentumDecay(state, sphere, today);
       sphere.todaySeconds = 0;
       sphere.dailyProgressDate = today;
-      sphere.momentum = clamp(sphere.momentum - decay, 0, 100);
+      const floor = sumEffects(effectsForSphere(state, sphere), "INCREASE_MOMENTUM_FLOOR");
+      sphere.momentum = clamp(sphere.momentum - decay, floor, 100);
       sphere.updatedAt = nowIso();
     }
   }
@@ -241,6 +455,13 @@ export const createDomainSphere = (
     glyphSlotCount: 1,
     equippedGlyphIds: [],
     level: 1,
+    xp: 0,
+    availablePoints: 0,
+    spentPoints: 0,
+    pathAllocations: [],
+    charge: 0,
+    firstRespecUsed: false,
+    lastSessionAt: null,
     momentum: 35,
     currentStreak: 0,
     bestStreak: 0,
@@ -358,7 +579,7 @@ export const archiveDomainSphere = (state: AppState, sphereId: string) => {
 
 export const purchaseSphereLevel = (state: AppState, sphereId: string) => {
   const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
-  if (!sphere) return false;
+  if (!sphere || sphere.kind !== "center") return false;
 
   const cost = sphereLevelCost(sphere);
   if (state.game.energy < cost) return false;
@@ -495,7 +716,14 @@ export const finishActiveSession = (state: AppState) => {
     1,
     Math.floor((Date.now() - new Date(active.startedAt).getTime()) / 1000),
   );
-  const hadMilestone = sphere.milestoneCompletedDate === localDateKey();
+  const today = localDateKey();
+  const hadMilestone = sphere.milestoneCompletedDate === today;
+  const hadAnyProgressToday = sphere.todaySeconds > 0;
+  const inactiveReturn =
+    sphere.kind === "domain" &&
+    sphere.lastSessionAt !== null &&
+    new Date(endedAt).getTime() - new Date(sphere.lastSessionAt).getTime() >=
+      inactivityReturnThresholdMs;
 
   sphere.totalSeconds += durationSeconds;
   sphere.todaySeconds += durationSeconds;
@@ -547,21 +775,32 @@ export const finishActiveSession = (state: AppState) => {
   const completedMilestoneAfterSession = reachedMilestone && !hadMilestone;
 
   if (completedMilestoneAfterSession) {
-    sphere.milestoneCompletedDate = localDateKey();
+    sphere.milestoneCompletedDate = today;
     sphere.currentStreak += 1;
     sphere.bestStreak = Math.max(sphere.bestStreak, sphere.currentStreak);
   }
 
   const minutes = durationSeconds / secondsPerMinute;
   const xpGained = minutes;
+  sphere.xp += xpGained;
+  recalculateSphereProgression(sphere);
   const momentumSessionBoost =
     minutes >= 5 ? momentumModel.focusedSessionBoost : momentumModel.shortSessionBoost;
   const milestoneMomentumBoost = completedMilestoneAfterSession ? momentumModel.milestoneBoost : 0;
   const momentumBefore = sphere.momentum;
   const glyphMomentumBoost = hasGlyphEffect(state, sphere.id, "persistence") ? 1 : 0;
+  const effects = effectsForSphere(state, sphere);
+  const returnBoost = inactiveReturn
+    ? sumEffects(effects, "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS")
+    : 0;
+  const momentumFloor = sumEffects(effects, "INCREASE_MOMENTUM_FLOOR");
   sphere.momentum = clamp(
-    sphere.momentum + momentumSessionBoost + milestoneMomentumBoost + glyphMomentumBoost,
-    0,
+    sphere.momentum +
+      momentumSessionBoost +
+      milestoneMomentumBoost +
+      glyphMomentumBoost +
+      returnBoost,
+    momentumFloor,
     100,
   );
 
@@ -569,8 +808,54 @@ export const finishActiveSession = (state: AppState) => {
   const deepWorkMultiplier =
     hasGlyphEffect(state, sphere.id, "deep-work") && minutes >= 25 ? 1.2 : 1;
   const activeEnergy = minutes * activePerMinute * deepWorkMultiplier;
-  const milestoneEnergy = completedMilestoneAfterSession ? sphere.dailyTargetMinutes * 2 : 0;
-  const energyGained = activeEnergy + milestoneEnergy;
+  const baseMilestoneEnergy = sphere.dailyTargetMinutes * 2;
+  const bloomMultiplier = 1 + sumEffects(effects, "MULTIPLY_MILESTONE_BLOOM");
+  const fullBloomEnergy = baseMilestoneEnergy * bloomMultiplier;
+  const miniBloomEnergy =
+    !hadAnyProgressToday && !completedMilestoneAfterSession
+      ? fullBloomEnergy * sumEffects(effects, "FIRST_SESSION_MINI_BLOOM")
+      : 0;
+  const milestoneEnergy = completedMilestoneAfterSession ? fullBloomEnergy : miniBloomEnergy;
+  const milestoneChargeRelease =
+    completedMilestoneAfterSession && sumEffects(effects, "RELEASE_CHARGE_ON_MILESTONE") > 0
+      ? sphere.charge
+      : 0;
+  if (milestoneChargeRelease > 0) sphere.charge = 0;
+  const sessionChargeRelease =
+    milestoneChargeRelease > 0
+      ? 0
+      : sphere.charge * Math.min(1, sumEffects(effects, "RELEASE_CHARGE_ON_SESSION_END"));
+  if (sessionChargeRelease > 0) sphere.charge -= sessionChargeRelease;
+  const bloomNeighborEnergy = completedMilestoneAfterSession
+    ? state.connections
+        .filter((connection) => {
+          if (
+            !connection.active ||
+            (connection.fromSphereId !== sphere.id && connection.toSphereId !== sphere.id)
+          ) {
+            return false;
+          }
+          const neighborId =
+            connection.fromSphereId === sphere.id ? connection.toSphereId : connection.fromSphereId;
+          return state.spheres.some(
+            (item) => item.id === neighborId && item.kind === "domain" && !item.archivedAt,
+          );
+        })
+        .reduce(
+          (total) => total + milestoneEnergy * sumEffects(effects, "BLOOM_NEIGHBOR_ENERGY_SHARE"),
+          0,
+        )
+    : 0;
+  const energyGained =
+    activeEnergy +
+    milestoneEnergy +
+    milestoneChargeRelease +
+    sessionChargeRelease +
+    bloomNeighborEnergy;
+
+  const chargeStored =
+    (activeEnergy + milestoneEnergy) * sumEffects(effects, "STORE_INCOMING_ENERGY_AS_CHARGE");
+  sphere.charge = Math.min(maxChargeForSphere(state, sphere), sphere.charge + chargeStored);
 
   state.game.energy += energyGained;
   state.game.lifetimeEnergy += energyGained;
@@ -591,6 +876,7 @@ export const finishActiveSession = (state: AppState) => {
 
   state.sessions.unshift(session);
   state.activeSession = null;
+  sphere.lastSessionAt = endedAt;
   sphere.updatedAt = endedAt;
 
   return {

@@ -1,12 +1,44 @@
 export type SphereKind = "center" | "domain";
 
+export type SpherePath = "Flow" | "Charge" | "Bloom" | "Anchor";
+
+export type ModifierEffect =
+  | { type: "MULTIPLY_OUTGOING_ENERGY"; value: number }
+  | { type: "REDUCE_ROUTING_LOSS"; value: number }
+  | { type: "ACTIVE_EDGE_THROUGHPUT_BONUS"; value: number }
+  | { type: "STORE_INCOMING_ENERGY_AS_CHARGE"; value: number }
+  | { type: "MULTIPLY_MAX_CHARGE"; value: number }
+  | { type: "RELEASE_CHARGE_ON_MILESTONE"; value: number }
+  | { type: "RELEASE_CHARGE_ON_SESSION_END"; value: number }
+  | { type: "MULTIPLY_MILESTONE_BLOOM"; value: number }
+  | { type: "BLOOM_NEIGHBOR_ENERGY_SHARE"; value: number }
+  | { type: "FIRST_SESSION_MINI_BLOOM"; value: number }
+  | { type: "REDUCE_MOMENTUM_DECAY"; value: number }
+  | { type: "INCREASE_MOMENTUM_FLOOR"; value: number }
+  | { type: "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS"; value: number };
+
+export type TalentDefinition = {
+  id: string;
+  path: SpherePath;
+  rank: number;
+  name: string;
+  description: string;
+  effects: ModifierEffect[];
+};
+
 export type GlyphEffect =
   | "streak"
   | "recent-consistency"
   | "deep-work"
   | "recovery"
   | "persistence"
-  | "resonance";
+  | "resonance"
+  | "amplify"
+  | "store"
+  | "release"
+  | "bloom"
+  | "echo"
+  | "kindle";
 
 export type Glyph = {
   id: string;
@@ -16,6 +48,11 @@ export type Glyph = {
   equippedSphereId: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type PathAllocation = {
+  path: SpherePath;
+  rank: number;
 };
 
 export type Sphere = {
@@ -29,6 +66,13 @@ export type Sphere = {
   glyphSlotCount: number;
   equippedGlyphIds: string[];
   level: number;
+  xp: number;
+  availablePoints: number;
+  spentPoints: number;
+  pathAllocations: PathAllocation[];
+  charge: number;
+  firstRespecUsed: boolean;
+  lastSessionAt: string | null;
   momentum: number;
   currentStreak: number;
   bestStreak: number;

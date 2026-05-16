@@ -51,6 +51,12 @@ type LegacyPersistedStateRecord = {
 };
 
 const nowIso = () => new Date().toISOString();
+const migratedXpThresholds = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500] as const;
+const levelForMigratedXp = (xp: number) =>
+  migratedXpThresholds.reduce(
+    (level, threshold, index) => (xp >= threshold ? index + 1 : level),
+    1,
+  );
 
 export const createId = (prefix: string) => {
   const random = globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2);
@@ -82,6 +88,13 @@ export const createInitialState = (): AppState => {
         glyphSlotCount: 0,
         equippedGlyphIds: [],
         level: 1,
+        xp: 0,
+        availablePoints: 0,
+        spentPoints: 0,
+        pathAllocations: [],
+        charge: 0,
+        firstRespecUsed: false,
+        lastSessionAt: null,
         momentum: 50,
         currentStreak: 0,
         bestStreak: 0,
@@ -199,7 +212,67 @@ const createStarterGlyphs = (now: string): Glyph[] => [
     createdAt: now,
     updatedAt: now,
   },
+  {
+    id: "glyph_amplify",
+    name: "Amplify",
+    effect: "amplify",
+    description: "Sphere output +10%.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_store",
+    name: "Store",
+    effect: "store",
+    description: "Store 5% of outgoing Energy as Charge.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_release",
+    name: "Release",
+    effect: "release",
+    description: "Session end releases 25% of Charge.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_bloom",
+    name: "Bloom",
+    effect: "bloom",
+    description: "Milestone Bloom +20%.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_echo",
+    name: "Echo",
+    effect: "echo",
+    description: "Bloom Energy ripples into connected spheres.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
+  {
+    id: "glyph_kindle",
+    name: "Kindle",
+    effect: "kindle",
+    description: "First return after inactivity gives +8 Momentum.",
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  },
 ];
+
+const mergeStarterGlyphs = (glyphs: Glyph[], now: string) => {
+  const existingIds = new Set(glyphs.map((glyph) => glyph.id));
+  const missingStarters = createStarterGlyphs(now).filter((glyph) => !existingIds.has(glyph.id));
+  return [...glyphs, ...missingStarters];
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
@@ -220,16 +293,35 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
 
   const restored = { ...createInitialState(), ...candidate } as AppState;
   restored.connections = Array.isArray(candidate.connections) ? restored.connections : [];
-  restored.glyphs = Array.isArray(candidate.glyphs)
-    ? restored.glyphs
-    : createStarterGlyphs(nowIso());
+  restored.glyphs = mergeStarterGlyphs(
+    Array.isArray(candidate.glyphs) ? restored.glyphs : [],
+    nowIso(),
+  );
   restored.activeSession = isRecord(candidate.activeSession) ? restored.activeSession : null;
-  restored.spheres = restored.spheres.map((sphere) => ({
-    ...sphere,
-    glyphSlotCount: sphere.glyphSlotCount ?? (sphere.kind === "domain" ? 1 : 0),
-    equippedGlyphIds: sphere.equippedGlyphIds ?? [],
-    archivedAt: sphere.archivedAt ?? null,
-  }));
+  restored.spheres = restored.spheres.map((sphere) => {
+    const legacySphere = sphere as Sphere & { lastSessionDate?: string | null };
+    const xp = sphere.xp ?? Math.floor((sphere.totalSeconds ?? 0) / 60);
+    const level = sphere.kind === "domain" ? levelForMigratedXp(xp) : (sphere.level ?? 1);
+    const pathAllocations = sphere.pathAllocations ?? [];
+    const spentPoints = pathAllocations.reduce((total, allocation) => total + allocation.rank, 0);
+    return {
+      ...sphere,
+      level,
+      xp,
+      availablePoints:
+        sphere.kind === "domain"
+          ? Math.max(0, level - 1 - spentPoints)
+          : (sphere.availablePoints ?? 0),
+      spentPoints: sphere.kind === "domain" ? spentPoints : (sphere.spentPoints ?? 0),
+      pathAllocations,
+      charge: sphere.charge ?? 0,
+      firstRespecUsed: sphere.firstRespecUsed ?? false,
+      lastSessionAt: sphere.lastSessionAt ?? legacySphere.lastSessionDate ?? null,
+      glyphSlotCount: sphere.glyphSlotCount ?? (sphere.kind === "domain" ? 1 : 0),
+      equippedGlyphIds: sphere.equippedGlyphIds ?? [],
+      archivedAt: sphere.archivedAt ?? null,
+    };
+  });
   const center = restored.spheres.find((sphere) => sphere.id === centerSphereId);
   const existingCenterRituals = restored.rituals.filter(
     (ritual) => ritual.sphereId === centerSphereId,

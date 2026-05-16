@@ -1,5 +1,11 @@
 import "./style.css";
-import { type AppState, type Session, type Sphere, centerSphereId } from "./domain.ts";
+import {
+  type AppState,
+  type Session,
+  type Sphere,
+  type SpherePath,
+  centerSphereId,
+} from "./domain.ts";
 import {
   activeRitualsForSphere,
   applyPassiveProduction,
@@ -24,7 +30,13 @@ import {
   setActiveRitual,
   sphereLevelCost,
   sphereSlotCost,
+  pathRank,
   purchaseSphereLevel,
+  respecSphere,
+  spendSpherePoint,
+  spherePaths,
+  talentDefinitions,
+  maxChargeForSphere,
   toggleConnection,
   startSession,
   unequipGlyph,
@@ -46,9 +58,11 @@ type CompletionFeedback = {
   completedMilestone: boolean;
 };
 
-type ViewMode = "home" | "systems" | "history";
+type FocusLayer = "activity" | "game";
+type LatticePanel = "growth" | "route" | "glyphs";
 
-let viewMode: ViewMode = "home";
+let focusLayer: FocusLayer = "activity";
+let latticePanel: LatticePanel = "growth";
 let selectedSphereId: string | null = null;
 let lastReward: string | null = null;
 let lastCompletion: CompletionFeedback | null = null;
@@ -57,9 +71,11 @@ let isCreatingSphere = false;
 let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
 let editingRitualId: string | null = null;
+let isSettingsOpen = false;
 
 const backupInputId = "backup-import-input";
 const round = (value: number) => Math.floor(value).toLocaleString();
+const oneDecimal = (value: number) => value.toFixed(1).replace(/\.0$/, "");
 const percent = (value: number) => `${Math.round(value)}%`;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const formatSessionTime = (iso: string) =>
@@ -267,15 +283,76 @@ const renderSphereFocus = (sphere: Sphere | null) => {
   return `
     <section class="focus-panel" style="--sphere-color: ${sphere.color}">
       <div class="focus-heading"><p class="kicker">${sphere.kind === "center" ? "Recovery hub" : dailyState(sphere)}</p><h1>${sphere.name}</h1></div>
-      <div class="progress-lens" aria-label="${percent(progress)} daily bloom progress"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Bloomed" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
-      <div class="start-cluster">
-        <div><span>Active ritual</span><strong>${ritual?.name ?? "Focus"}${ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</strong></div>
-        <button data-action="start-session" data-sphere-id="${sphere.id}">${state.activeSession ? "Session running" : sphere.kind === "center" ? "Start recovery" : "Start ritual"}</button>
-      </div>
-      <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>Gain</dt><dd>${rates.activePerMinute.toFixed(1)}/m</dd></div></dl>
-      ${renderRitualHotbar(sphere)}
-      <div class="panel-actions"><button class="quiet" data-action="show-create-ritual" data-sphere-id="${sphere.id}">New ritual</button>${sphere.kind === "domain" ? `<button class="quiet" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Tune sphere</button>` : ""}<button class="quiet" data-action="set-view" data-view="systems">Systems</button></div>
+      <nav class="layer-tabs" aria-label="${sphere.name} focus"><button class="${focusLayer === "activity" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="activity">Today</button><button class="${focusLayer === "game" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="game">Lattice</button></nav>
+      ${
+        focusLayer === "activity"
+          ? `<div class="sphere-layer sphere-activity-layer">
+              <div class="progress-lens" aria-label="${percent(progress)} daily bloom progress"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Bloomed" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
+              <div class="start-cluster">
+                <div><span>Active ritual</span><strong>${ritual?.name ?? "Focus"}${ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</strong></div>
+                <button data-action="start-session" data-sphere-id="${sphere.id}">${state.activeSession ? "Session running" : sphere.kind === "center" ? "Start recovery" : "Start ritual"}</button>
+              </div>
+              <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>${sphere.kind === "domain" ? "Points" : "Gain"}</dt><dd>${sphere.kind === "domain" ? sphere.availablePoints : `${rates.activePerMinute.toFixed(1)}/m`}</dd></div></dl>
+              ${renderRitualHotbar(sphere)}
+              <div class="panel-actions">${sphere.kind === "domain" ? `<button class="quiet" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Tune sphere</button>` : ""}</div>
+              ${renderSphereTraces(sphere)}
+            </div>`
+          : renderSphereGameLayer(sphere)
+      }
     </section>`;
+};
+
+const renderSphereTraces = (sphere: Sphere) => {
+  const sessions = state.sessions.filter((session) => session.sphereId === sphere.id).slice(0, 5);
+  return `<section class="sphere-traces" aria-label="Recent ${sphere.name} traces"><div class="layer-section-title"><span>Recent traces</span><strong>${sessions.length}</strong></div>${
+    sessions.length > 0
+      ? `<ol class="compact-trace-list">${sessions.map(renderSessionHistoryItem).join("")}</ol>`
+      : `<p class="empty-history">No traces for this sphere yet. Start one ritual and it will appear here.</p>`
+  }</section>`;
+};
+
+const renderSphereGameLayer = (sphere: Sphere) => {
+  const levelCost = sphereLevelCost(sphere);
+  const canAffordLevel = state.game.energy >= levelCost;
+  const rates =
+    sphere.kind === "domain"
+      ? routedSphereRates(state, sphere)
+      : { activePerMinute: centerRecoveryMultiplier(state), passivePerHour: 0 };
+  const connection = connectionForSphere(state, sphere.id);
+  const routedTo = connection
+    ? state.spheres.find((item) => item.id === connection.toSphereId)?.name
+    : null;
+  const equippedGlyphs = equippedGlyphsForSphere(state, sphere.id);
+  const availableGlyphs = state.glyphs.filter((glyph) => !glyph.equippedSphereId);
+  const routeOptions = [
+    { id: centerSphereId, name: "Center" },
+    ...activeDomainSpheres()
+      .filter((item) => item.id !== sphere.id)
+      .map((item) => ({ id: item.id, name: item.name })),
+  ];
+  const availablePanels = sphere.kind === "domain" ? ["growth", "route", "glyphs"] : ["growth"];
+  if (!availablePanels.includes(latticePanel)) latticePanel = "growth";
+  const panelNav =
+    sphere.kind === "domain"
+      ? `<nav class="lattice-menu" aria-label="Lattice menus"><button class="${latticePanel === "growth" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="growth">Growth</button><button class="${latticePanel === "route" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="route">Route</button><button class="${latticePanel === "glyphs" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="glyphs">Glyphs</button></nav>`
+      : "";
+  const activePanel =
+    sphere.kind === "center"
+      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Recovery center</span><p>Rest still feeds the lattice, without becoming another obligation.</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Deepen center · ${round(levelCost)} energy</button></section>`
+      : latticePanel === "route" && connection
+        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Energy route</span><p>${connection.active ? `Flowing toward ${routedTo ?? "another sphere"}.` : "Paused. Start it again when this support path matters."}</p></div><label>Send flow<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause flow" : "Resume flow"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap direction</button></div></section>`
+        : latticePanel === "glyphs"
+          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Glyphs ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Small modifiers for a sphere you already understand.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add glyph<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose a glyph</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}</select></label></section>`
+          : renderProgressionPanel(sphere);
+  return `<div class="sphere-layer sphere-game-layer">
+    <section class="lattice-summary" aria-label="Lattice effect for ${sphere.name}">
+      <span><b>Session</b> ${rates.activePerMinute.toFixed(1)}/m</span>
+      <span><b>Away</b> ${rates.passivePerHour.toFixed(1)}/h</span>
+      <span><b>${sphere.kind === "domain" ? "Points" : "Rest"}</b> ${sphere.kind === "domain" ? sphere.availablePoints : `×${centerRecoveryMultiplier(state).toFixed(2)}`}</span>
+    </section>
+    ${panelNav}
+    ${activePanel}
+  </div>`;
 };
 
 const renderRitualHotbar = (sphere: Sphere) => {
@@ -290,56 +367,24 @@ const renderRitualHotbar = (sphere: Sphere) => {
     )}<button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Ritual</button></div>`;
 };
 
-const renderSystems = (spheres: Sphere[]) => `
-  <section class="systems-surface">
-    <div class="section-heading"><div><p class="kicker">Deep systems</p><h2>Routes, glyphs, upgrades</h2></div><button class="quiet" data-action="set-view" data-view="home">Return to sigil</button></div>
-    <div class="system-grid">${[
-      state.spheres.find((sphere) => sphere.id === centerSphereId),
-      ...spheres,
-    ]
-      .filter(Boolean)
-      .map((sphere) => renderSystemCard(sphere as Sphere))
+const renderProgressionPanel = (sphere: Sphere) => {
+  const nextXp = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500][sphere.level] ?? null;
+  const respecCost = sphere.firstRespecUsed ? 25 * sphere.spentPoints : 0;
+  return `<section class="lattice-section progression-panel">
+    <div class="lattice-section-copy"><span>Growth paths</span><p>Choose one next bend for this sphere. You can rebuild paths later.</p></div>
+    <div class="progression-summary"><span>XP ${oneDecimal(sphere.xp)}${nextXp ? ` / ${nextXp}` : ""}</span><span>Points ${sphere.availablePoints}</span><span>Stored charge ${oneDecimal(sphere.charge)} / ${oneDecimal(maxChargeForSphere(state, sphere))}</span></div>
+    <div class="path-grid">${spherePaths
+      .map((path) => {
+        const rank = pathRank(sphere, path);
+        const next = talentDefinitions.find(
+          (talent) => talent.path === path && talent.rank === Math.min(3, rank + 1),
+        );
+        return `<div class="path-column"><div><strong>${path}</strong><span>${rank}/3</span></div><p>${next?.description ?? "Path complete."}</p><button class="quiet" data-action="spend-path-point" data-sphere-id="${sphere.id}" data-path="${path}" ${sphere.availablePoints > 0 && rank < 3 ? "" : "disabled"}>${rank === 0 ? "Start path" : rank < 3 ? "Grow path" : "Complete"}</button></div>`;
+      })
       .join("")}</div>
+    <button class="quiet" data-action="respec-sphere" data-sphere-id="${sphere.id}" ${sphere.spentPoints > 0 && state.game.energy >= respecCost ? "" : "disabled"}>Rebuild paths${respecCost > 0 ? ` · ${round(respecCost)} energy` : " · free"}</button>
   </section>`;
-
-const renderSystemCard = (sphere: Sphere) => {
-  const levelCost = sphereLevelCost(sphere);
-  const canAffordLevel = state.game.energy >= levelCost;
-  const rates =
-    sphere.kind === "domain"
-      ? routedSphereRates(state, sphere)
-      : { activePerMinute: centerRecoveryMultiplier(state), passivePerHour: 0 };
-  const connection = connectionForSphere(state, sphere.id);
-  const equippedGlyphs = equippedGlyphsForSphere(state, sphere.id);
-  const availableGlyphs = state.glyphs.filter((glyph) => !glyph.equippedSphereId);
-  const routeOptions = [
-    { id: centerSphereId, name: "Center" },
-    ...activeDomainSpheres()
-      .filter((item) => item.id !== sphere.id)
-      .map((item) => ({ id: item.id, name: item.name })),
-  ];
-  return `<article class="system-card" style="--sphere-color: ${sphere.color}">
-    <div class="system-title"><p class="kicker">${sphere.kind === "center" ? "Core" : dailyState(sphere)}</p><h3>${sphere.name}</h3><button class="quiet" data-action="select-sphere" data-sphere-id="${sphere.id}">Focus</button></div>
-    <dl class="focus-stats"><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>Active</dt><dd>${rates.activePerMinute.toFixed(1)}/m</dd></div><div><dt>Passive</dt><dd>${rates.passivePerHour.toFixed(1)}/h</dd></div></dl>
-    <button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Upgrade · ${round(levelCost)} energy</button>
-    ${
-      connection && sphere.kind === "domain"
-        ? `<div class="route-row"><span>${connection.active ? "Route live" : "Route dormant"}</span><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Quiet route" : "Light route"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Reverse</button><select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>To ${option.name}</option>`).join("")}</select></div>`
-        : ""
-    }
-    ${
-      sphere.kind === "domain"
-        ? `<div class="glyph-row"><span>Glyphs ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span>${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Equip glyph</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}</select></div>`
-        : `<p class="system-note">Recovery multiplier ×${centerRecoveryMultiplier(state).toFixed(2)}. Rest nudges the lattice without adding another obligation.</p>`
-    }
-  </article>`;
 };
-
-const renderHistory = () => `
-  <section class="history-surface">
-    <div class="section-heading"><div><p class="kicker">Traces</p><h2>Recent sessions</h2></div><button class="quiet" data-action="set-view" data-view="home">Return to sigil</button></div>
-    ${state.sessions.length > 0 ? `<ol class="history-list">${state.sessions.slice(0, 18).map(renderSessionHistoryItem).join("")}</ol>` : `<p class="empty-history">No traces yet. Start one ritual and the lattice will remember it here.</p>`}
-  </section>`;
 
 const renderSessionHistoryItem = (session: Session) => {
   const sphere = state.spheres.find((item) => item.id === session.sphereId);
@@ -348,7 +393,12 @@ const renderSessionHistoryItem = (session: Session) => {
 };
 
 const renderModalLayers = () =>
-  `${isCreatingSphere ? `<div class="modal-scrim">${renderCreateOrEditSphereForm(null)}</div>` : ""}${renderEditSphereModal()}${renderRitualModal()}${renderEditRitualModal()}${lastReward ? `<aside class="toast" role="status">${lastReward}</aside>` : ""}`;
+  `${isCreatingSphere ? `<div class="modal-scrim">${renderCreateOrEditSphereForm(null)}</div>` : ""}${renderEditSphereModal()}${renderRitualModal()}${renderEditRitualModal()}${renderSettingsPanel()}${lastReward ? `<aside class="toast" role="status">${lastReward}</aside>` : ""}`;
+
+const renderSettingsPanel = () =>
+  isSettingsOpen
+    ? `<div class="modal-scrim settings-scrim"><section class="settings-panel" role="dialog" aria-labelledby="settings-title"><div class="settings-heading"><p class="kicker">Local first</p><h1 id="settings-title">Settings</h1><button class="quiet" type="button" data-action="close-settings">Close</button></div><div class="settings-group"><h2>Data</h2><p>Your Snowball lives in this browser. Export a backup before changing devices or clearing browser data.</p><div class="settings-actions"><button class="quiet" data-action="export-backup">Export backup</button><button class="quiet" data-action="import-backup">Import backup</button></div></div><div class="settings-group danger-zone"><h2>Reset</h2><p>This clears local spheres, rituals, sessions, energy, and XP from this browser.</p><button class="quiet danger" data-action="reset">Reset local data</button></div></section></div>`
+    : "";
 
 const renderEditSphereModal = () => {
   if (!editingSphereId) return "";
@@ -405,11 +455,11 @@ const renderHome = () => {
     <main class="app-shell">
       <header class="app-header">
         <div class="brand-mark">Snowball</div>
-        <nav class="mode-nav" aria-label="Primary views"><button class="${viewMode === "home" ? "is-selected" : ""}" data-action="set-view" data-view="home">Sigil</button><button class="${viewMode === "systems" ? "is-selected" : ""}" data-action="set-view" data-view="systems">Systems</button><button class="${viewMode === "history" ? "is-selected" : ""}" data-action="set-view" data-view="history">Traces</button></nav>
         ${renderEconomyDock(spheres)}
+        <button class="settings-button quiet" type="button" data-action="open-settings">Settings</button>
       </header>
-      ${viewMode === "home" ? `<div class="home-grid">${renderSigil(spheres)}${renderSphereFocus(selected)}</div>` : viewMode === "systems" ? renderSystems(spheres) : renderHistory()}
-      <footer class="utility-row"><button class="quiet" data-action="show-create-sphere" ${canUnlockSphereSlot(state) ? "" : "disabled"}>${canUnlockSphereSlot(state) ? "Add sphere" : `Next sphere · ${round(sphereSlotCost(state))} energy`}</button><button class="quiet" data-action="export-backup">Export backup</button><button class="quiet" data-action="import-backup">Import backup</button><button class="quiet danger" data-action="reset">Reset local data</button><input id="${backupInputId}" class="visually-hidden" type="file" accept="application/json,.json" /></footer>
+      <div class="home-grid">${renderSigil(spheres)}${renderSphereFocus(selected)}</div>
+      <input id="${backupInputId}" class="visually-hidden" type="file" accept="application/json,.json" />
       ${renderModalLayers()}
     </main>`;
 };
@@ -454,6 +504,7 @@ app.addEventListener("change", async (event) => {
     editingSphereId = null;
     creatingRitualForSphereId = null;
     editingRitualId = null;
+    isSettingsOpen = false;
     selectedSphereId = null;
     persistState();
     render();
@@ -477,7 +528,8 @@ app.addEventListener("submit", (event) => {
     const sphere = createDomainSphere(state, name, color, target ?? 20);
     if (sphere) {
       selectedSphereId = sphere.id;
-      viewMode = "home";
+      focusLayer = "activity";
+      latticePanel = "growth";
       lastReward =
         activeDomainSpheres().length === 1 ? "First sphere planted" : "New orbit unlocked";
       isCreatingSphere = false;
@@ -512,13 +564,24 @@ app.addEventListener("click", async (event) => {
   if (!actionElement) return;
   const action = actionElement.dataset.action;
 
-  if (action === "set-view") {
-    viewMode = (actionElement.dataset.view as ViewMode) ?? "home";
+  if (action === "set-focus-layer") {
+    focusLayer = (actionElement.dataset.layer as FocusLayer) ?? "activity";
+    render();
+  }
+  if (action === "set-lattice-panel") {
+    latticePanel = (actionElement.dataset.panel as LatticePanel) ?? "growth";
+    render();
+  }
+  if (action === "open-settings") {
+    isSettingsOpen = true;
+    render();
+  }
+  if (action === "close-settings") {
+    isSettingsOpen = false;
     render();
   }
   if (action === "select-sphere") {
     selectedSphereId = actionElement.dataset.sphereId ?? null;
-    viewMode = "home";
     lastCompletion = null;
     render();
   }
@@ -593,7 +656,21 @@ app.addEventListener("click", async (event) => {
   }
   if (action === "level-sphere") {
     const sphereId = actionElement.dataset.sphereId;
-    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Sphere leveled up";
+    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Center deepened";
+    persistState();
+    render();
+  }
+  if (action === "spend-path-point") {
+    const sphereId = actionElement.dataset.sphereId;
+    const path = actionElement.dataset.path;
+    if (sphereId && path && spendSpherePoint(state, sphereId, path as SpherePath))
+      lastReward = "Sphere path grown";
+    persistState();
+    render();
+  }
+  if (action === "respec-sphere") {
+    const sphereId = actionElement.dataset.sphereId;
+    if (sphereId && respecSphere(state, sphereId)) lastReward = "Sphere reshaped";
     persistState();
     render();
   }
@@ -672,8 +749,10 @@ app.addEventListener("click", async (event) => {
     editingSphereId = null;
     creatingRitualForSphereId = null;
     editingRitualId = null;
+    isSettingsOpen = false;
     selectedSphereId = null;
-    viewMode = "home";
+    focusLayer = "activity";
+    latticePanel = "growth";
     render();
   }
 });

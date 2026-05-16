@@ -156,7 +156,6 @@ input[type="color"] {
 .focus-panel,
 .systems-surface,
 .history-surface,
-.utility-row,
 .form-panel,
 .session-sheet,
 .completion-toast,
@@ -216,9 +215,9 @@ input[type="color"] {
   color: var(--ink-2);
 }
 
-.mode-nav {
+.layer-tabs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-2);
   padding: var(--space-1);
   border: 1px solid var(--line-soft);
@@ -226,7 +225,7 @@ input[type="color"] {
   background: oklch(10% 0.035 278 / 0.7);
 }
 
-.mode-nav button,
+.layer-tabs button,
 .quiet,
 .ritual-chip,
 .ritual-edit,
@@ -238,7 +237,7 @@ input[type="color"] {
   box-shadow: none;
 }
 
-.mode-nav button.is-selected,
+.layer-tabs button.is-selected,
 .ritual-chip.is-selected {
   background: oklch(25% 0.065 278 / 0.85);
   color: var(--ink-0);
@@ -591,8 +590,7 @@ input[type="color"] {
 .panel-actions,
 .form-actions,
 .route-row,
-.glyph-row,
-.utility-row {
+.glyph-row {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
@@ -720,13 +718,6 @@ input[type="color"] {
 .empty-history {
   margin: 0;
   color: var(--ink-2);
-}
-
-.utility-row {
-  justify-content: center;
-  border-radius: var(--radius-md);
-  padding: var(--space-3);
-  background: oklch(12% 0.038 278 / 0.78);
 }
 
 .onboarding-shell {
@@ -980,9 +971,6 @@ input[type="color"] {
   .app-header {
     grid-template-columns: 1fr auto;
   }
-  .mode-nav {
-    min-width: 360px;
-  }
   .economy-dock {
     position: fixed;
     top: max(var(--space-5), env(safe-area-inset-top));
@@ -1081,7 +1069,7 @@ input[type="color"] {
   position: sticky;
   top: max(var(--space-2), env(safe-area-inset-top));
   z-index: 12;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: auto 1fr;
   gap: var(--space-3);
   min-height: 54px;
   border-color: oklch(70% 0.08 278 / 0.18);
@@ -1100,22 +1088,20 @@ input[type="color"] {
   text-transform: uppercase;
 }
 
-.mode-nav {
-  justify-self: center;
-  min-width: 0;
-  width: min(340px, 100%);
-  border: 0;
-  background: transparent;
+.layer-tabs {
+  width: 100%;
+  border-color: oklch(78% 0.1 232 / 0.14);
+  background: oklch(8% 0.028 278 / 0.62);
 }
 
-.mode-nav button {
+.layer-tabs button {
   min-height: 38px;
   color: var(--ink-2);
 }
 
-.mode-nav button.is-selected {
+.layer-tabs button.is-selected {
   border-color: oklch(78% 0.1 232 / 0.24);
-  background: oklch(84% 0.08 232 / 0.12);
+  background: color-mix(in srgb, var(--sphere-color), transparent 84%);
 }
 
 .economy-dock {
@@ -1246,11 +1232,10 @@ input[type="color"] {
   z-index: 8;
   width: auto;
   grid-template-columns: minmax(0, 1fr);
-  align-content: center;
+  align-content: start;
   align-items: start;
-  gap: var(--space-5);
+  gap: var(--space-4);
   border: 0;
-  border-left: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
   border-radius: 0;
   padding: clamp(var(--space-5), 4vw, var(--space-7)) var(--space-5);
   background:
@@ -1265,10 +1250,47 @@ input[type="color"] {
 }
 
 .focus-heading,
+.layer-tabs,
+.sphere-layer,
 .start-cluster,
 .ritual-hotbar,
 .panel-actions {
   grid-column: 1;
+}
+
+.sphere-layer {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sphere-game-layer {
+  gap: var(--space-5);
+}
+
+.sphere-traces {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-2);
+}
+
+.layer-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--ink-3);
+  font-size: 0.68rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.compact-trace-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .focus-panel .kicker {
@@ -1339,16 +1361,10 @@ input[type="color"] {
 }
 
 .systems-surface,
-.history-surface,
-.utility-row {
+.history-surface {
   border-color: oklch(70% 0.08 278 / 0.16);
   background: oklch(9% 0.032 278 / 0.58);
   box-shadow: none;
-}
-
-.utility-row {
-  justify-content: flex-end;
-  border-radius: 999px;
 }
 
 .system-card,
@@ -1399,8 +1415,7 @@ input[type="color"] {
   }
 
   .focus-panel {
-    border-left: 0;
-    border-top: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--sphere-color), transparent 78%);
     padding: var(--space-4);
   }
 
@@ -1411,6 +1426,7 @@ input[type="color"] {
 
 /* Second simplification pass: remove remaining panel weight from primary HUD */
 .app-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
   border-color: transparent;
   background: linear-gradient(90deg, oklch(9% 0.03 278 / 0.72), oklch(9% 0.03 278 / 0.38));
 }
@@ -1442,18 +1458,9 @@ input[type="color"] {
   mask-image: linear-gradient(135deg, black, transparent 72%);
 }
 
-.utility-row {
-  margin-top: -2px;
-  border-color: transparent;
-  background: transparent;
-}
-
-.utility-row .quiet {
-  color: var(--ink-3);
-}
-
 @media (max-width: 720px) {
   .app-header {
+    grid-template-columns: 1fr auto;
     gap: var(--space-2);
     border-radius: 22px;
     background: oklch(8% 0.028 278 / 0.64);
@@ -1463,12 +1470,12 @@ input[type="color"] {
     display: none;
   }
 
-  .mode-nav {
-    order: 2;
-  }
-
   .economy-dock {
     order: 1;
+  }
+
+  .settings-button {
+    order: 2;
   }
 
   .focus-panel {
@@ -1489,4 +1496,648 @@ input[type="color"] {
   .reward-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
+
+.progression-panel {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+}
+
+.progression-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.progression-summary span {
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border-radius: 16px;
+  padding: var(--space-2);
+  color: var(--ink-2);
+  background: color-mix(in srgb, var(--sphere-color), transparent 92%);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.path-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+.path-column {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.55fr) minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  border: 1px solid oklch(82% 0.04 278 / 0.13);
+  border-radius: 18px;
+  padding: var(--space-3);
+  background: oklch(13% 0.025 278 / 0.42);
+}
+
+.path-column > div {
+  display: grid;
+  gap: var(--space-1);
+  color: var(--ink-1);
+}
+
+.path-column p {
+  margin: 0;
+  color: var(--ink-3);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.path-column .quiet {
+  min-height: 34px;
+  padding-inline: var(--space-3);
+}
+
+.sphere-game-layer .route-row,
+.sphere-game-layer .glyph-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid oklch(82% 0.04 278 / 0.13);
+  border-radius: 18px;
+  background: oklch(11% 0.032 278 / 0.5);
+}
+
+.sphere-game-layer .route-row select,
+.sphere-game-layer .glyph-row select {
+  width: 100%;
+}
+
+@media (max-width: 520px) {
+  .progression-summary,
+  .path-column {
+    grid-template-columns: 1fr;
+  }
+}
+.settings-button {
+  min-height: 38px;
+  padding-inline: var(--space-3);
+  color: var(--ink-2);
+}
+
+.settings-button:hover {
+  color: var(--ink-0);
+}
+
+.lattice-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.lattice-summary div,
+.lattice-section {
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--sphere-color), oklch(10% 0.03 278) 91%);
+}
+
+.lattice-summary div {
+  padding: var(--space-3);
+}
+
+.lattice-summary span,
+.lattice-section-copy span,
+.lattice-section label {
+  display: block;
+  color: var(--ink-3);
+  font-size: 0.62rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lattice-summary strong {
+  display: block;
+  color: var(--ink-0);
+  font-size: 0.95rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lattice-section {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.lattice-section-copy {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.lattice-section-copy p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.lattice-actions,
+.equipped-glyphs,
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.settings-panel {
+  width: min(560px, 100%);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+  background: var(--panel-strong);
+  box-shadow: 0 24px 80px var(--shadow);
+}
+
+.settings-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+  margin-bottom: var(--space-5);
+}
+
+.settings-heading .kicker {
+  grid-column: 1;
+}
+
+.settings-heading h1 {
+  grid-column: 1;
+  margin: 0;
+  color: var(--ink-0);
+  font-size: 2rem;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.settings-heading button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.settings-group {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--line-soft);
+}
+
+.settings-group h2 {
+  margin: 0;
+  color: var(--ink-0);
+  font-size: 1rem;
+}
+
+.settings-group p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink-2);
+}
+
+.danger-zone {
+  border-color: oklch(70% 0.14 24 / 0.22);
+}
+
+@media (max-width: 720px) {
+  .lattice-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-panel {
+    align-self: end;
+    border-radius: 26px 26px 0 0;
+    padding: var(--space-4);
+  }
+}
+
+/* Review pass: game-panel menus, compact stats, fewer cards */
+.sphere-game-layer {
+  gap: var(--space-3);
+}
+
+.lattice-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 76%);
+  padding-block: var(--space-2);
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sphere-color), transparent 92%),
+    transparent
+  );
+}
+
+.lattice-summary span {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: baseline;
+  min-width: 0;
+  padding: var(--space-1) var(--space-3);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+  color: var(--ink-0);
+  font-size: 0.9rem;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+
+.lattice-summary span:last-child {
+  border-right: 0;
+}
+
+.lattice-summary b {
+  color: var(--ink-3);
+  font-size: 0.62rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.lattice-menu {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 72%);
+  background: oklch(8% 0.026 278 / 0.7);
+}
+
+.lattice-menu button {
+  min-height: 38px;
+  border: 0;
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+  border-radius: 0;
+  padding-inline: var(--space-2);
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lattice-menu button:last-child {
+  box-shadow: none;
+}
+
+.lattice-menu button.is-selected {
+  background: color-mix(in srgb, var(--sphere-color), transparent 84%);
+  color: var(--ink-0);
+}
+
+.lattice-section {
+  position: relative;
+  gap: var(--space-3);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 74%);
+  border-radius: 8px;
+  padding: var(--space-4);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sphere-color), transparent 91%),
+      transparent 58%
+    ),
+    oklch(9% 0.028 278 / 0.78);
+}
+
+.lattice-section::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sphere-color), transparent 72%) 0 1px,
+      transparent 1px
+    ),
+    linear-gradient(0deg, oklch(90% 0.02 278 / 0.045) 0 1px, transparent 1px);
+  background-size:
+    22px 100%,
+    100% 22px;
+  mask-image: linear-gradient(135deg, black, transparent 70%);
+}
+
+.lattice-section-copy,
+.progression-summary,
+.path-grid,
+.lattice-actions,
+.lattice-section label,
+.equipped-glyphs {
+  position: relative;
+  z-index: 1;
+}
+
+.lattice-section-copy span,
+.lattice-section label {
+  color: color-mix(in srgb, var(--sphere-color), var(--ink-0) 34%);
+}
+
+.lattice-section-copy p {
+  max-width: 48ch;
+  color: var(--ink-2);
+}
+
+.progression-panel {
+  gap: var(--space-3);
+}
+
+.progression-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.progression-summary span {
+  border: 0;
+  border-radius: 0;
+  padding: 0 var(--space-2) 0 0;
+  color: var(--ink-2);
+  background: transparent;
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+}
+
+.path-grid {
+  gap: var(--space-2);
+}
+
+.path-column {
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 80%);
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  background: oklch(7% 0.024 278 / 0.62);
+}
+
+.path-column p {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.sphere-game-layer .route-row,
+.sphere-game-layer .glyph-row {
+  gap: var(--space-3);
+  border-radius: 8px;
+  padding: var(--space-4);
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sphere-color), transparent 91%),
+      transparent 58%
+    ),
+    oklch(9% 0.028 278 / 0.78);
+}
+
+@media (max-width: 520px) {
+  .lattice-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .lattice-summary span {
+    display: grid;
+    gap: 0;
+    padding-inline: var(--space-2);
+  }
+
+  .path-column {
+    grid-template-columns: 1fr auto;
+  }
+
+  .path-column p {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Review pass: carry sharper game-panel language into Today and chrome */
+.app-header {
+  overflow: hidden;
+  border: 1px solid oklch(76% 0.08 232 / 0.16);
+  border-radius: 10px;
+  background:
+    linear-gradient(90deg, oklch(8% 0.026 278 / 0.92), oklch(11% 0.034 278 / 0.58)),
+    linear-gradient(90deg, oklch(78% 0.12 232 / 0.14), transparent 42%);
+  box-shadow: inset 0 1px 0 oklch(95% 0.02 278 / 0.055);
+}
+
+.brand-mark {
+  color: var(--accent);
+}
+
+.settings-button {
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px oklch(80% 0.08 232 / 0.12);
+}
+
+.layer-tabs {
+  gap: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 70%);
+  border-radius: 6px;
+  padding: 0;
+  background: oklch(7% 0.024 278 / 0.82);
+}
+
+.layer-tabs button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+  color: var(--ink-3);
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.layer-tabs button:last-child {
+  box-shadow: none;
+}
+
+.layer-tabs button.is-selected {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--sphere-color), transparent 78%), transparent),
+    oklch(14% 0.04 278 / 0.9);
+  color: var(--ink-0);
+}
+
+.sphere-activity-layer {
+  gap: var(--space-3);
+}
+
+.sphere-activity-layer .progress-lens {
+  width: 104px;
+  height: 104px;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 68%);
+  border-radius: 8px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sphere-color), transparent 88%),
+      transparent 62%
+    ),
+    conic-gradient(
+      color-mix(in srgb, var(--sphere-color), white 6%) var(--progress),
+      oklch(28% 0.04 278 / 0.5) 0
+    );
+}
+
+.sphere-activity-layer .progress-lens::before {
+  inset: 8px;
+  border-radius: 4px;
+  background: oklch(8% 0.026 278 / 0.9);
+}
+
+.start-cluster {
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border-radius: 8px;
+  padding: var(--space-3);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 90%), transparent),
+    oklch(8% 0.026 278 / 0.72);
+}
+
+.start-cluster button {
+  border-radius: 4px;
+}
+
+.focus-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 80%);
+  padding-block: var(--space-2);
+}
+
+.focus-stats div {
+  min-width: 5.5rem;
+  padding: 0 var(--space-3);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 84%);
+}
+
+.focus-stats div:last-child {
+  box-shadow: none;
+}
+
+.ritual-wrap {
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border-radius: 6px;
+  background: oklch(8% 0.026 278 / 0.62);
+}
+
+.ritual-chip,
+.ritual-edit,
+.add-chip,
+.panel-actions .quiet {
+  border-radius: 4px;
+}
+
+.sphere-traces {
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 80%);
+  border-radius: 8px;
+  padding: var(--space-3);
+  background: oklch(8% 0.026 278 / 0.56);
+}
+
+.sphere-traces .history-item {
+  border-radius: 4px;
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    border-radius: 8px;
+  }
+
+  .start-cluster {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Bugfix pass: Today panel alignment and matching shell radius */
+.home-grid {
+  border-radius: 10px;
+}
+
+@media (max-width: 720px) {
+  .home-grid {
+    border-radius: 8px;
+  }
+}
+
+.sphere-activity-layer .progress-lens {
+  justify-self: stretch;
+  width: auto;
+  height: auto;
+  min-height: 92px;
+  place-items: start;
+  align-content: center;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background:
+    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 88%), transparent),
+    oklch(8% 0.026 278 / 0.72);
+}
+
+.sphere-activity-layer .progress-lens::before {
+  display: none;
+}
+
+.sphere-activity-layer .progress-lens strong,
+.sphere-activity-layer .progress-lens small {
+  position: static;
+}
+
+.sphere-activity-layer .progress-lens strong {
+  font-size: 1.55rem;
+}
+
+.sphere-activity-layer .progress-lens small {
+  color: var(--ink-2);
+}
+
+.focus-stats div {
+  border-radius: 0;
+  background: transparent;
+}
+
+.panel-actions {
+  min-height: 0;
+}
+
+.panel-actions:empty {
+  display: none;
+}
+
+.panel-actions .quiet {
+  min-height: 36px;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
+  padding-inline: var(--space-3);
+  color: var(--ink-2);
+  background: oklch(8% 0.026 278 / 0.52);
+}
+
+.ritual-hotbar {
+  gap: var(--space-2);
+}
+
+.add-chip {
+  border-style: solid;
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 72%);
 }

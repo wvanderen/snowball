@@ -73,20 +73,24 @@ describe("core game calculations", () => {
     vi.useRealTimers();
   });
 
-  it("does not apply passive production for tiny or negative elapsed time windows", () => {
+  it("applies tiny passive production ticks but ignores negative elapsed time windows", () => {
     vi.useFakeTimers();
     setNow("2026-05-08T12:00:00.000Z");
     const state = createInitialState();
     createDomainSphere(state, "Health", "#22c55e", 30);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+    sphere.level = 2;
+    sphere.momentum = 50;
+    sphere.passiveEnergyRate = 0.001;
     state.game.lastPassiveTickAt = "2026-05-08T11:59:45.000Z";
 
-    expect(applyPassiveProduction(state)).toBe(0);
-    expect(state.game.energy).toBe(0);
-    expect(state.game.lastPassiveTickAt).toBe("2026-05-08T11:59:45.000Z");
+    expect(applyPassiveProduction(state)).toBeCloseTo(0.0225);
+    expect(state.game.energy).toBeCloseTo(0.0225);
+    expect(state.game.lastPassiveTickAt).toBe("2026-05-08T12:00:00.000Z");
 
     state.game.lastPassiveTickAt = "2026-05-08T12:01:00.000Z";
     expect(applyPassiveProduction(state)).toBe(0);
-    expect(state.game.energy).toBe(0);
+    expect(state.game.energy).toBeCloseTo(0.0225);
     expect(state.game.lastPassiveTickAt).toBe("2026-05-08T12:01:00.000Z");
 
     vi.useRealTimers();

@@ -405,7 +405,7 @@ export const applyPassiveProduction = (state: AppState) => {
     maxPassiveElapsedSeconds,
     Math.max(0, (now.getTime() - lastTick.getTime()) / 1000),
   );
-  if (elapsedSeconds < 30) return 0;
+  if (elapsedSeconds <= 0) return 0;
 
   const energyPerSecond = domainSpheres(state).reduce((total, sphere) => {
     const { passivePerHour } = routedSphereRates(state, sphere);

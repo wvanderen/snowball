@@ -1484,6 +1484,7 @@ input[type="color"] {
 
   .focus-panel {
     overflow-y: auto;
+    scrollbar-gutter: stable;
   }
 }
 

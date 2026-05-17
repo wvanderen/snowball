@@ -90,6 +90,10 @@ const activeElapsedSeconds = () =>
   state.activeSession
     ? Math.floor((Date.now() - new Date(state.activeSession.startedAt).getTime()) / 1000)
     : 0;
+const liveTodaySeconds = (sphere: Sphere) =>
+  state.activeSession?.sphereId === sphere.id
+    ? sphere.todaySeconds + activeElapsedSeconds()
+    : sphere.todaySeconds;
 const persistState = () => {
   void saveState(state).catch((error: unknown) => {
     console.error("Unable to save Snowball state", error);
@@ -98,12 +102,13 @@ const persistState = () => {
 
 const sphereProgress = (sphere: Sphere) => {
   if (sphere.dailyTargetMinutes <= 0) return 0;
-  return Math.min(100, (sphere.todaySeconds / (sphere.dailyTargetMinutes * 60)) * 100);
+  return Math.min(100, (liveTodaySeconds(sphere) / (sphere.dailyTargetMinutes * 60)) * 100);
 };
 
 const dailyState = (sphere: Sphere) => {
   if (sphere.milestoneCompletedDate === sphere.dailyProgressDate) return "done";
   const progress = sphereProgress(sphere);
+  if (state.activeSession?.sphereId === sphere.id && progress >= 100) return "target ready";
   if (progress >= 70) return "70%+";
   if (progress > 0) return "active";
   if (sphere.momentum < 35) return "low";
@@ -265,6 +270,19 @@ const renderSigil = (spheres: Sphere[]) => {
     </section>`;
 };
 
+const projectedActiveEnergy = () => {
+  const active = state.activeSession;
+  if (!active) return 0;
+  const sphere = state.spheres.find((item) => item.id === active.sphereId);
+  if (!sphere) return 0;
+  const minutes = activeElapsedSeconds() / 60;
+  const rate =
+    sphere.kind === "domain"
+      ? routedSphereRates(state, sphere).activePerMinute
+      : centerRecoveryMultiplier(state);
+  return minutes * rate;
+};
+
 const renderEconomyDock = (spheres: Sphere[]) => {
   const passiveRate = spheres.reduce(
     (sum, sphere) => sum + routedSphereRates(state, sphere).passivePerHour,
@@ -283,7 +301,7 @@ const renderEconomyDock = (spheres: Sphere[]) => {
     : `${oneDecimal(passiveRate)}/h`;
   return `
     <aside class="economy-dock" aria-label="Snowball economy">
-      <div><span>Energy</span><strong>${round(state.game.energy)}</strong></div>
+      <div><span>Energy</span><strong>${round(state.game.energy + projectedActiveEnergy())}</strong></div>
       <div><span>XP</span><strong>${round(state.game.experience)}</strong></div>
       <div><span>Gain</span><strong>+${currentGain}</strong></div>
       <div><span>Idle</span><strong>${round(passiveRate)}/h</strong></div>
@@ -306,7 +324,7 @@ const renderSphereFocus = (sphere: Sphere | null) => {
       ${
         focusLayer === "activity"
           ? `<div class="sphere-layer sphere-activity-layer">
-              <div class="progress-lens" aria-label="${percent(progress)} daily target"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Done" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
+              <div class="progress-lens" aria-label="${percent(progress)} daily target"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Done" : percent(progress)}</strong><small>${formatMinutes(liveTodaySeconds(sphere))} / ${sphere.dailyTargetMinutes}m</small></div>
               <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>${sphere.kind === "domain" ? "Pts" : "Gain"}</dt><dd>${sphere.kind === "domain" ? sphere.availablePoints : `${rates.activePerMinute.toFixed(1)}/m`}</dd></div></dl>
               <p class="mechanic-line">${sphere.kind === "domain" ? `Progress = today minutes ÷ ${sphere.dailyTargetMinutes}m. ${levelProgressCopy(sphere)}.` : `Rest energy = minutes × ${centerRecoveryMultiplier(state).toFixed(2)}. Rest also raises every node's momentum by 1 to 4.`}</p>
               <div class="panel-actions">${sphere.kind === "domain" ? `<button class="quiet icon-button" data-action="show-edit-sphere" data-sphere-id="${sphere.id}" aria-label="Edit ${sphere.name}" title="Edit">✎</button>` : ""}</div>
@@ -509,11 +527,18 @@ const renderHome = () => {
 };
 
 const render = () => {
+  const restoreWindowScroll = window.scrollY;
+  const restoreFocusScroll = document.querySelector<HTMLElement>(".focus-panel")?.scrollTop ?? null;
   const passiveGained = applyPassiveProduction(state);
   if (passiveGained > 1) lastReward = `+${round(passiveGained)} passive energy while away`;
   persistState();
   if (activeDomainSpheres().length === 0) renderOnboarding();
   else renderHome();
+  if (state.activeSession) {
+    window.scrollTo({ top: restoreWindowScroll, left: window.scrollX, behavior: "instant" });
+    const focusPanel = document.querySelector<HTMLElement>(".focus-panel");
+    if (focusPanel && restoreFocusScroll !== null) focusPanel.scrollTop = restoreFocusScroll;
+  }
 };
 
 app.addEventListener("change", async (event) => {

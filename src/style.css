@@ -89,7 +89,7 @@ button {
   border: 1px solid oklch(82% 0.1 232 / 0.36);
   border-radius: 999px;
   padding: 0 var(--space-5);
-  background: linear-gradient(135deg, oklch(77% 0.13 218), oklch(76% 0.16 292));
+  background: linear-gradient(180deg, oklch(78% 0.14 218), oklch(72% 0.16 292));
   color: oklch(13% 0.04 278);
   font-weight: 800;
   letter-spacing: -0.01em;
@@ -98,15 +98,29 @@ button {
     transform 160ms var(--ease-out),
     filter 160ms var(--ease-out),
     border-color 160ms var(--ease-out),
-    background 160ms var(--ease-out);
+    background 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.25),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.2),
+    0 2px 8px oklch(2% 0.02 278 / 0.2);
 }
 
-button:hover {
+button:hover:not(.sigil-node) {
   transform: translateY(-1px);
   filter: brightness(1.06);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.3),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.2),
+    0 4px 16px oklch(2% 0.02 278 / 0.3),
+    0 0 12px oklch(78% 0.14 232 / 0.12);
 }
-button:active {
+button:active:not(.sigil-node) {
   transform: translateY(0) scale(0.99);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.15),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 1px 4px oklch(2% 0.02 278 / 0.15);
 }
 button:disabled {
   cursor: not-allowed;
@@ -128,8 +142,22 @@ input {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   padding: 0 var(--space-4);
-  background: oklch(12% 0.04 278 / 0.92);
+  background: oklch(8% 0.024 278 / 0.92);
   color: var(--ink-0);
+  transition:
+    border-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+select:hover,
+input:hover {
+  border-color: oklch(78% 0.12 232 / 0.28);
+}
+
+select:focus,
+input:focus {
+  border-color: oklch(78% 0.14 232 / 0.36);
+  box-shadow: 0 0 8px oklch(78% 0.14 232 / 0.12);
 }
 
 input[type="color"] {
@@ -207,6 +235,7 @@ input[type="color"] {
   font-weight: 900;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  text-shadow: 0 0 10px oklch(78% 0.14 232 / 0.28);
 }
 
 .lede {
@@ -217,7 +246,7 @@ input[type="color"] {
 
 .layer-tabs {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: var(--space-2);
   padding: var(--space-1);
   border: 1px solid var(--line-soft);
@@ -239,9 +268,10 @@ input[type="color"] {
 
 .layer-tabs button.is-selected,
 .ritual-chip.is-selected {
-  background: oklch(25% 0.065 278 / 0.85);
+  background: color-mix(in srgb, var(--sphere-color), transparent 78%);
   color: var(--ink-0);
-  border-color: var(--line);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 52%);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 42%);
 }
 
 .danger {
@@ -282,11 +312,13 @@ input[type="color"] {
   color: var(--ink-0);
   font-size: 1.12rem;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 8px oklch(78% 0.12 232 / 0.2);
 }
 
 .active-chip {
   grid-column: 1 / -1;
   border: 1px solid oklch(72% 0.12 160 / 0.25);
+  box-shadow: 0 0 12px oklch(72% 0.12 160 / 0.12);
 }
 
 .home-grid {
@@ -400,8 +432,8 @@ input[type="color"] {
   isolation: isolate;
 }
 
-.sigil-node:hover {
-  transform: translate(-50%, -51.5%);
+.sigil-node:hover .node-ring {
+  box-shadow: 0 0 16px color-mix(in srgb, var(--sphere-color), transparent 52%);
 }
 
 .node-ring {
@@ -672,8 +704,16 @@ input[type="color"] {
   width: auto;
 }
 .glyph-chip {
-  border: 1px solid var(--line-soft);
-  background: oklch(17% 0.045 278);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
+  background: oklch(12% 0.04 278 / 0.72);
+  transition:
+    border-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.glyph-chip:hover {
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 42%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 62%);
 }
 .system-note {
   margin: 0;
@@ -727,6 +767,9 @@ input[type="color"] {
   min-height: 100svh;
   padding: var(--space-5);
   overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, oklch(35% 0.1 278 / 0.15), transparent 30rem),
+    linear-gradient(180deg, oklch(10% 0.034 278), oklch(7% 0.026 278));
 }
 .onboarding-sigil {
   position: absolute;
@@ -742,7 +785,10 @@ input[type="color"] {
   height: 74px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 28%, var(--ink-0), var(--accent));
-  box-shadow: 0 0 40px oklch(72% 0.13 232 / 0.48);
+  box-shadow:
+    0 0 40px oklch(72% 0.13 232 / 0.48),
+    0 0 80px oklch(72% 0.13 232 / 0.16);
+  animation: sigil-drift 12s ease-in-out infinite alternate;
 }
 .onboarding-sigil span:nth-child(1) {
   left: 50%;
@@ -770,7 +816,15 @@ input[type="color"] {
   max-width: 520px;
   border-radius: var(--radius-lg);
   padding: var(--space-6);
-  background: var(--panel-strong);
+  border-color: color-mix(in srgb, var(--accent), transparent 62%);
+  background:
+    linear-gradient(180deg, oklch(14% 0.045 278 / 0.96), oklch(10% 0.032 278 / 0.96)),
+    radial-gradient(circle at 50% 0%, oklch(78% 0.12 232 / 0.08), transparent 60%);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.06),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 24px 80px oklch(2% 0.02 278 / 0.5),
+    0 0 0 1px oklch(78% 0.12 232 / 0.08);
 }
 .sphere-form {
   display: grid;
@@ -807,8 +861,8 @@ input[type="color"] {
   display: grid;
   place-items: center;
   padding: var(--space-4);
-  background: oklch(6% 0.028 278 / 0.72);
-  backdrop-filter: blur(18px);
+  background: oklch(4% 0.02 278 / 0.82);
+  backdrop-filter: blur(24px);
 }
 
 .session-sheet {
@@ -821,23 +875,29 @@ input[type="color"] {
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: var(--space-3);
   align-items: center;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 48%);
   border-radius: 28px;
   padding: var(--space-3);
   background:
     linear-gradient(
       90deg,
-      color-mix(in srgb, var(--sphere-color), transparent 82%),
+      color-mix(in srgb, var(--sphere-color), transparent 68%),
       transparent 38%
     ),
-    oklch(10% 0.035 278 / 0.82);
+    oklch(8% 0.026 278 / 0.92);
   text-align: left;
   backdrop-filter: blur(14px);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.08),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 8px 32px oklch(2% 0.02 278 / 0.4),
+    0 0 24px color-mix(in srgb, var(--sphere-color), transparent 62%);
 }
 .session-sheet::before {
   content: "";
   position: absolute;
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 68%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 42%);
   border-radius: inherit;
   pointer-events: none;
   mask-image: linear-gradient(90deg, black, transparent 82%);
@@ -851,6 +911,7 @@ input[type="color"] {
     oklch(28% 0.04 278 / 0.5) 0
   );
   padding: 6px;
+  box-shadow: 0 0 16px color-mix(in srgb, var(--sphere-color), transparent 42%);
 }
 .session-orb span {
   display: block;
@@ -862,6 +923,7 @@ input[type="color"] {
     var(--ink-0),
     color-mix(in srgb, var(--sphere-color), black 45%)
   );
+  box-shadow: inset 0 -4px 8px oklch(2% 0.01 278 / 0.3);
 }
 .session-copy h2 {
   font-size: 1.35rem;
@@ -876,6 +938,7 @@ input[type="color"] {
   letter-spacing: -0.08em;
   line-height: 0.9;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--sphere-color), transparent 42%);
 }
 .timer-mode,
 .session-sheet p {
@@ -894,6 +957,7 @@ input[type="color"] {
   padding: var(--space-3);
   color: var(--green);
   background: oklch(25% 0.08 160 / 0.18);
+  text-shadow: 0 0 8px oklch(78% 0.13 160 / 0.2);
 }
 
 .toast {
@@ -902,12 +966,21 @@ input[type="color"] {
   bottom: max(var(--space-4), env(safe-area-inset-bottom));
   z-index: 50;
   width: min(420px, calc(100% - var(--space-6)));
+  border: 1px solid oklch(76% 0.08 232 / 0.2);
   border-radius: var(--radius-md);
   padding: var(--space-4);
-  background: var(--panel-strong);
+  background: linear-gradient(180deg, oklch(14% 0.045 278 / 0.96), oklch(10% 0.032 278 / 0.96));
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.06),
+    0 12px 40px oklch(2% 0.02 278 / 0.4),
+    0 0 16px oklch(78% 0.12 232 / 0.08);
 }
 .completion-toast.is-bloom {
-  box-shadow: 0 0 48px oklch(82% 0.13 78 / 0.16);
+  box-shadow:
+    0 0 48px oklch(82% 0.13 78 / 0.22),
+    0 0 16px oklch(78% 0.14 232 / 0.12),
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.08),
+    0 12px 40px oklch(2% 0.02 278 / 0.4);
 }
 .completion-toast .reward-grid {
   justify-self: end;
@@ -961,6 +1034,14 @@ input[type="color"] {
   100% {
     transform: scale(1);
     filter: brightness(1);
+  }
+}
+@keyframes sigil-drift {
+  0% {
+    transform: translate(-50%, -50%);
+  }
+  100% {
+    transform: translate(-50%, -52%);
   }
 }
 
@@ -1128,6 +1209,7 @@ input[type="color"] {
 
 .economy-dock strong {
   font-size: 0.95rem;
+  text-shadow: 0 0 8px oklch(78% 0.12 232 / 0.2);
 }
 
 .home-grid {
@@ -1137,12 +1219,15 @@ input[type="color"] {
   align-items: stretch;
   min-height: calc(100svh - 104px);
   overflow: hidden;
-  border: 1px solid oklch(78% 0.08 235 / 0.12);
+  border: 1px solid oklch(78% 0.08 235 / 0.16);
   border-radius: 30px;
   background:
     radial-gradient(circle at 44% 50%, oklch(35% 0.08 278 / 0.22), transparent 25rem),
     linear-gradient(180deg, oklch(10% 0.034 278), oklch(7% 0.026 278));
-  box-shadow: inset 0 0 0 1px oklch(90% 0.02 278 / 0.025);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 4px 24px oklch(2% 0.02 278 / 0.35);
 }
 
 .sigil-stage {
@@ -1171,7 +1256,7 @@ input[type="color"] {
 
 .node-ring {
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 55%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 42%);
   background:
     conic-gradient(
       color-mix(in srgb, var(--sphere-color), white 5%) var(--progress),
@@ -1179,6 +1264,7 @@ input[type="color"] {
     ),
     oklch(10% 0.032 278 / 0.85);
   filter: none;
+  transition: box-shadow 200ms var(--ease-out);
 }
 
 .node-ring::after {
@@ -1190,10 +1276,11 @@ input[type="color"] {
 .node-core {
   width: 70%;
   height: 70%;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 55%);
-  background: color-mix(in srgb, var(--sphere-color), oklch(13% 0.04 278) 76%);
-  box-shadow: 0 0 calc(8px + var(--momentum) * 0.18px)
-    color-mix(in srgb, var(--sphere-color), transparent 72%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 48%);
+  background: color-mix(in srgb, var(--sphere-color), oklch(13% 0.04 278) 72%);
+  box-shadow: 0 0 calc(8px + var(--momentum) * 0.22px)
+    color-mix(in srgb, var(--sphere-color), transparent 62%);
+  transition: box-shadow 200ms var(--ease-out);
 }
 
 .node-core span {
@@ -1215,7 +1302,9 @@ input[type="color"] {
 
 .sigil-node.is-selected .node-ring {
   filter: none;
-  box-shadow: 0 0 0 5px color-mix(in srgb, var(--sphere-color), transparent 84%);
+  box-shadow:
+    0 0 0 5px color-mix(in srgb, var(--sphere-color), transparent 72%),
+    0 0 20px color-mix(in srgb, var(--sphere-color), transparent 52%);
 }
 
 .route-line {
@@ -1256,6 +1345,10 @@ input[type="color"] {
 .ritual-hotbar,
 .panel-actions {
   grid-column: 1;
+}
+
+.layer-tabs {
+  margin-bottom: var(--space-1);
 }
 
 .sphere-layer {
@@ -1437,22 +1530,24 @@ input[type="color"] {
 }
 
 .focus-panel {
-  border-color: color-mix(in srgb, var(--sphere-color), transparent 78%);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 62%);
   background:
     radial-gradient(
       circle at 0 38%,
-      color-mix(in srgb, var(--sphere-color), transparent 84%),
+      color-mix(in srgb, var(--sphere-color), transparent 80%),
       transparent 15rem
     ),
     linear-gradient(90deg, oklch(7% 0.026 278 / 0.18), oklch(7% 0.026 278 / 0.72));
-  box-shadow: inset 1px 0 0 oklch(90% 0.02 278 / 0.06);
+  box-shadow:
+    inset 1px 0 0 oklch(90% 0.02 278 / 0.06),
+    inset -1px 0 0 oklch(2% 0.01 278 / 0.2);
 }
 
 .focus-panel::before {
   content: "";
   position: absolute;
   inset: 0;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   border-radius: inherit;
   pointer-events: none;
   mask-image: linear-gradient(135deg, black, transparent 72%);
@@ -1653,11 +1748,17 @@ input[type="color"] {
 
 .settings-panel {
   width: min(560px, 100%);
-  border: 1px solid var(--line-soft);
+  border: 1px solid oklch(76% 0.08 232 / 0.2);
   border-radius: var(--radius-lg);
   padding: var(--space-5);
-  background: var(--panel-strong);
-  box-shadow: 0 24px 80px var(--shadow);
+  background:
+    linear-gradient(180deg, oklch(14% 0.045 278 / 0.96), oklch(10% 0.032 278 / 0.96)),
+    radial-gradient(circle at 50% 0%, oklch(78% 0.12 232 / 0.06), transparent 60%);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.06),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 24px 80px oklch(2% 0.02 278 / 0.5),
+    0 0 0 1px oklch(78% 0.12 232 / 0.06);
 }
 
 .settings-heading {
@@ -1726,17 +1827,24 @@ input[type="color"] {
   gap: var(--space-3);
 }
 
+.sphere-game-layer .lattice-menu {
+  margin-bottom: var(--space-1);
+}
+
 .lattice-summary {
   display: flex;
   flex-wrap: wrap;
   gap: 0;
-  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 58%);
   padding-block: var(--space-2);
   background: linear-gradient(
     90deg,
-    color-mix(in srgb, var(--sphere-color), transparent 92%),
+    color-mix(in srgb, var(--sphere-color), transparent 86%),
     transparent
   );
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.03),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.25);
 }
 
 .lattice-summary span {
@@ -1745,12 +1853,13 @@ input[type="color"] {
   align-items: baseline;
   min-width: 0;
   padding: var(--space-1) var(--space-3);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 72%);
   color: var(--ink-0);
   font-size: 0.9rem;
   font-weight: 850;
   letter-spacing: -0.01em;
   text-transform: none;
+  text-shadow: 0 0 6px color-mix(in srgb, var(--sphere-color), transparent 52%);
 }
 
 .lattice-summary span:last-child {
@@ -1767,49 +1876,94 @@ input[type="color"] {
 
 .lattice-menu {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 72%);
-  background: oklch(8% 0.026 278 / 0.7);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 58%);
+  background: oklch(4% 0.016 278 / 0.92);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.05),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.4);
 }
 
 .lattice-menu button {
-  min-height: 38px;
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 32px;
   border: 0;
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
   border-radius: 0;
   padding-inline: var(--space-2);
   background: transparent;
   color: var(--ink-3);
-  font-size: 0.72rem;
+  font-size: 0.62rem;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  transition:
+    background 140ms var(--ease-out),
+    color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.lattice-menu button svg {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 140ms var(--ease-out);
 }
 
 .lattice-menu button:last-child {
   box-shadow: none;
 }
 
+.lattice-menu button:not(.is-selected):hover {
+  background: oklch(16% 0.042 278 / 0.5);
+  color: var(--ink-1);
+}
+.lattice-menu button:not(.is-selected):hover svg {
+  opacity: 0.9;
+}
+
 .lattice-menu button.is-selected {
-  background: color-mix(in srgb, var(--sphere-color), transparent 84%);
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sphere-color), transparent 68%),
+      transparent 120%
+    ),
+    oklch(10% 0.035 278 / 0.9);
   color: var(--ink-0);
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--sphere-color), transparent 36%),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.2);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--sphere-color), transparent 38%);
+}
+.lattice-menu button.is-selected svg {
+  opacity: 1;
 }
 
 .lattice-section {
   position: relative;
   gap: var(--space-3);
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 74%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   border-radius: 8px;
   padding: var(--space-4);
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--sphere-color), transparent 91%),
+      color-mix(in srgb, var(--sphere-color), transparent 88%),
       transparent 58%
     ),
-    oklch(9% 0.028 278 / 0.78);
+    oklch(8% 0.026 278 / 0.88);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 2px 8px oklch(2% 0.02 278 / 0.25);
 }
 
 .lattice-section::before {
@@ -1842,7 +1996,8 @@ input[type="color"] {
 
 .lattice-section-copy span,
 .lattice-section label {
-  color: color-mix(in srgb, var(--sphere-color), var(--ink-0) 34%);
+  color: color-mix(in srgb, var(--sphere-color), var(--ink-0) 48%);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 52%);
 }
 
 .lattice-section-copy p {
@@ -1866,7 +2021,7 @@ input[type="color"] {
   padding: 0 var(--space-2) 0 0;
   color: var(--ink-2);
   background: transparent;
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 62%);
 }
 
 .path-grid {
@@ -1876,10 +2031,26 @@ input[type="color"] {
 .path-column {
   grid-template-columns: 5.5rem minmax(0, 1fr) auto;
   gap: var(--space-2);
-  border-color: color-mix(in srgb, var(--sphere-color), transparent 80%);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 68%);
   border-radius: 6px;
   padding: var(--space-2) var(--space-3);
-  background: oklch(7% 0.024 278 / 0.62);
+  background: oklch(6% 0.02 278 / 0.72);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.03),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.2);
+  transition:
+    background 140ms var(--ease-out),
+    border-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.path-column:hover {
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 52%);
+  background: oklch(8% 0.024 278 / 0.72);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.2),
+    0 0 8px color-mix(in srgb, var(--sphere-color), transparent 82%);
 }
 
 .path-column p {
@@ -1892,15 +2063,20 @@ input[type="color"] {
 .sphere-game-layer .route-row,
 .sphere-game-layer .glyph-row {
   gap: var(--space-3);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 58%);
   border-radius: 8px;
   padding: var(--space-4);
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--sphere-color), transparent 91%),
+      color-mix(in srgb, var(--sphere-color), transparent 86%),
       transparent 58%
     ),
-    oklch(9% 0.028 278 / 0.78);
+    oklch(7% 0.024 278 / 0.86);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 2px 8px oklch(2% 0.02 278 / 0.25);
 }
 
 @media (max-width: 520px) {
@@ -1930,13 +2106,17 @@ input[type="color"] {
   border: 1px solid oklch(76% 0.08 232 / 0.16);
   border-radius: 10px;
   background:
-    linear-gradient(90deg, oklch(8% 0.026 278 / 0.92), oklch(11% 0.034 278 / 0.58)),
+    linear-gradient(180deg, oklch(12% 0.04 278 / 0.95), oklch(8% 0.026 278 / 0.92)),
     linear-gradient(90deg, oklch(78% 0.12 232 / 0.14), transparent 42%);
-  box-shadow: inset 0 1px 0 oklch(95% 0.02 278 / 0.055);
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.055),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 2px 12px oklch(2% 0.02 278 / 0.4);
 }
 
 .brand-mark {
   color: var(--accent);
+  text-shadow: 0 0 16px oklch(78% 0.14 232 / 0.35);
 }
 
 .settings-button {
@@ -1944,37 +2124,91 @@ input[type="color"] {
   box-shadow: inset 0 0 0 1px oklch(80% 0.08 232 / 0.12);
 }
 
+.settings-button:hover {
+  box-shadow:
+    inset 0 0 0 1px oklch(80% 0.08 232 / 0.2),
+    0 0 8px oklch(78% 0.12 232 / 0.15);
+}
+
 .layer-tabs {
   gap: 0;
   overflow: hidden;
-  border-color: color-mix(in srgb, var(--sphere-color), transparent 70%);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 62%);
   border-radius: 6px;
   padding: 0;
-  background: oklch(7% 0.024 278 / 0.82);
+  background: oklch(5% 0.018 278 / 0.92);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.06),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.4);
 }
 
 .layer-tabs button {
-  min-height: 42px;
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 34px;
   border: 0;
   border-radius: 0;
+  padding-inline: var(--space-2);
   background: transparent;
   box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 82%);
   color: var(--ink-3);
-  font-size: 0.76rem;
+  font-size: 0.68rem;
   font-weight: 950;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  transition:
+    background 140ms var(--ease-out),
+    color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.layer-tabs button svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 140ms var(--ease-out);
+}
+
+.layer-tabs button span,
+.lattice-menu button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .layer-tabs button:last-child {
   box-shadow: none;
 }
 
+.layer-tabs button:not(.is-selected):hover {
+  background: oklch(18% 0.045 278 / 0.5);
+  color: var(--ink-1);
+}
+.layer-tabs button:not(.is-selected):hover svg {
+  opacity: 0.9;
+}
+
 .layer-tabs button.is-selected {
   background:
-    linear-gradient(180deg, color-mix(in srgb, var(--sphere-color), transparent 78%), transparent),
-    oklch(14% 0.04 278 / 0.9);
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sphere-color), transparent 72%),
+      transparent 120%
+    ),
+    oklch(12% 0.04 278 / 0.92);
   color: var(--ink-0);
+  box-shadow:
+    inset 0 2px 0 color-mix(in srgb, var(--sphere-color), transparent 42%),
+    inset 0 -2px 0 oklch(2% 0.01 278 / 0.2);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--sphere-color), transparent 42%);
+}
+.layer-tabs button.is-selected svg {
+  opacity: 1;
 }
 
 .sphere-activity-layer {
@@ -2005,40 +2239,63 @@ input[type="color"] {
 }
 
 .start-cluster {
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   border-radius: 8px;
   padding: var(--space-3);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 90%), transparent),
-    oklch(8% 0.026 278 / 0.72);
+    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 86%), transparent),
+    oklch(7% 0.022 278 / 0.82);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.25),
+    0 1px 6px oklch(2% 0.02 278 / 0.2);
 }
 
 .start-cluster button {
   border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 oklch(95% 0.02 278 / 0.15),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.3),
+    0 2px 6px oklch(2% 0.02 278 / 0.25);
 }
 
 .focus-stats {
   display: flex;
   flex-wrap: wrap;
   gap: 0;
-  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 80%);
+  border-block: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   padding-block: var(--space-2);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.03),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.25);
 }
 
 .focus-stats div {
   min-width: 5.5rem;
   padding: 0 var(--space-3);
-  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 84%);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 72%);
 }
 
 .focus-stats div:last-child {
   box-shadow: none;
 }
 
+.focus-stats dd {
+  text-shadow: 0 0 6px color-mix(in srgb, var(--sphere-color), transparent 52%);
+}
+
 .ritual-wrap {
-  border-color: color-mix(in srgb, var(--sphere-color), transparent 76%);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 58%);
   border-radius: 6px;
-  background: oklch(8% 0.026 278 / 0.62);
+  background: oklch(6% 0.02 278 / 0.62);
+  transition:
+    border-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.ritual-wrap:hover {
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 42%);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--sphere-color), transparent 72%);
 }
 
 .ritual-chip,
@@ -2049,10 +2306,13 @@ input[type="color"] {
 }
 
 .sphere-traces {
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 80%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   border-radius: 8px;
   padding: var(--space-3);
-  background: oklch(8% 0.026 278 / 0.56);
+  background: oklch(6% 0.02 278 / 0.72);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.03),
+    0 1px 4px oklch(2% 0.02 278 / 0.15);
 }
 
 .sphere-traces .history-item {
@@ -2090,9 +2350,14 @@ input[type="color"] {
   align-content: center;
   gap: var(--space-1);
   padding: var(--space-4);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 58%);
   background:
-    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 88%), transparent),
-    oklch(8% 0.026 278 / 0.72);
+    linear-gradient(90deg, color-mix(in srgb, var(--sphere-color), transparent 82%), transparent),
+    oklch(7% 0.022 278 / 0.82);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    inset 0 -1px 0 oklch(2% 0.01 278 / 0.25),
+    0 1px 6px oklch(2% 0.02 278 / 0.2);
 }
 
 .sphere-activity-layer .progress-lens::before {
@@ -2106,6 +2371,7 @@ input[type="color"] {
 
 .sphere-activity-layer .progress-lens strong {
   font-size: 1.55rem;
+  text-shadow: 0 0 12px color-mix(in srgb, var(--sphere-color), transparent 52%);
 }
 
 .sphere-activity-layer .progress-lens small {
@@ -2127,10 +2393,22 @@ input[type="color"] {
 
 .panel-actions .quiet {
   min-height: 36px;
-  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 78%);
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 62%);
   padding-inline: var(--space-3);
   color: var(--ink-2);
   background: oklch(8% 0.026 278 / 0.52);
+  transition:
+    background 140ms var(--ease-out),
+    color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.panel-actions .quiet:hover {
+  color: var(--ink-0);
+  background: oklch(14% 0.04 278 / 0.62);
+  box-shadow:
+    inset 0 1px 0 oklch(90% 0.02 278 / 0.04),
+    0 0 6px color-mix(in srgb, var(--sphere-color), transparent 82%);
 }
 
 .ritual-hotbar {
@@ -2139,5 +2417,13 @@ input[type="color"] {
 
 .add-chip {
   border-style: solid;
-  border-color: color-mix(in srgb, var(--sphere-color), transparent 72%);
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 52%);
+  transition:
+    border-color 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.add-chip:hover {
+  border-color: color-mix(in srgb, var(--sphere-color), transparent 32%);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 62%);
 }

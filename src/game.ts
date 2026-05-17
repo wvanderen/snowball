@@ -18,7 +18,7 @@ const maxPassiveElapsedSeconds = 8 * 60 * 60;
 const inactivityReturnThresholdMs = millisecondsPerDay;
 const baseMaxCharge = 100;
 
-const xpLevelThresholds = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500] as const;
+export const xpLevelThresholds = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500] as const;
 export const spherePaths: SpherePath[] = ["Flow", "Charge", "Bloom", "Anchor"];
 
 export const talentDefinitions: TalentDefinition[] = [

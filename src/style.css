@@ -2005,6 +2005,57 @@ input[type="color"] {
   color: var(--ink-2);
 }
 
+.lattice-section-copy small {
+  display: block;
+  max-width: 58ch;
+  margin-top: var(--space-1);
+  color: var(--ink-3);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+.mechanic-line {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 72%);
+  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  background: color-mix(in srgb, var(--sphere-color), oklch(7% 0.022 278) 88%);
+  color: var(--ink-2);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.mechanics-brief {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 66%);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--sphere-color), transparent 68%);
+}
+
+.mechanics-brief div {
+  display: grid;
+  grid-template-columns: 7.5rem minmax(0, 1fr);
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: oklch(6% 0.02 278 / 0.9);
+}
+
+.mechanics-brief b {
+  color: color-mix(in srgb, var(--sphere-color), var(--ink-0) 42%);
+  font-size: 0.66rem;
+  font-weight: 950;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mechanics-brief span {
+  color: var(--ink-2);
+  font-size: 0.76rem;
+  line-height: 1.42;
+}
+
 .progression-panel {
   gap: var(--space-3);
 }
@@ -2097,6 +2148,10 @@ input[type="color"] {
 
   .path-column p {
     grid-column: 1 / -1;
+  }
+
+  .mechanics-brief div {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -2838,5 +2893,162 @@ input {
 
   .sigil-stage {
     min-height: 430px;
+  }
+}
+
+/* Global session management toolbar */
+.session-toolbar {
+  display: grid;
+  grid-template-columns: minmax(11rem, 0.72fr) minmax(14rem, 1fr) auto;
+  gap: var(--space-2);
+  align-items: stretch;
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 58%);
+  border-radius: 8px;
+  padding: var(--space-2);
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sphere-color), transparent 88%),
+      transparent 58%
+    ),
+    oklch(7% 0.025 252 / 0.94);
+  box-shadow:
+    inset 0 0 0 1px oklch(90% 0.02 244 / 0.035),
+    0 2px 0 oklch(2% 0.01 252 / 0.52);
+}
+
+.session-toolbar-node,
+.session-toolbar-control,
+.toolbar-timer {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.session-toolbar-node {
+  gap: var(--space-2);
+  padding-inline: var(--space-2);
+}
+
+.session-toolbar-node strong,
+.toolbar-timer span {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-0);
+  font-weight: 950;
+  letter-spacing: -0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-toolbar-node small,
+.toolbar-timer small {
+  display: block;
+  overflow: hidden;
+  color: var(--ink-3);
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.66rem;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.toolbar-orb {
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  padding: 4px;
+  background: conic-gradient(
+    color-mix(in srgb, var(--sphere-color), white 8%) var(--progress),
+    oklch(26% 0.045 252 / 0.65) 0
+  );
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.toolbar-orb span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: color-mix(in srgb, var(--sphere-color), oklch(6% 0.024 252) 74%);
+  clip-path: inherit;
+}
+
+.active-chip.is-idle {
+  border-color: oklch(72% 0.05 244 / 0.18);
+  box-shadow: none;
+  opacity: 0.78;
+}
+
+.session-toolbar .ritual-hotbar {
+  align-content: center;
+  min-width: 0;
+  max-height: 76px;
+  overflow: auto;
+}
+
+.session-toolbar-control {
+  justify-content: end;
+  gap: var(--space-2);
+}
+
+.toolbar-timer {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 7.5rem;
+  padding-inline: var(--space-2);
+  box-shadow: inset -1px 0 0 color-mix(in srgb, var(--sphere-color), transparent 72%);
+}
+
+.toolbar-timer span {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: clamp(1.25rem, 3vw, 2rem);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.session-toolbar.target-complete {
+  border-color: oklch(80% 0.13 160 / 0.46);
+  box-shadow:
+    inset 0 0 0 1px oklch(90% 0.02 244 / 0.05),
+    0 0 0 2px oklch(80% 0.13 160 / 0.1),
+    0 2px 0 oklch(2% 0.01 252 / 0.52);
+}
+
+@media (min-width: 760px) {
+  .home-grid {
+    height: calc(100svh - 166px);
+  }
+}
+
+@media (max-width: 920px) {
+  .session-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .session-toolbar .ritual-hotbar {
+    grid-column: 1 / -1;
+    order: 3;
+  }
+}
+
+@media (max-width: 520px) {
+  .session-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .session-toolbar-control {
+    justify-content: stretch;
+  }
+
+  .session-toolbar-control button {
+    flex: 1;
+  }
+
+  .toolbar-timer {
+    align-items: flex-start;
+    box-shadow: none;
   }
 }

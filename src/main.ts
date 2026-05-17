@@ -37,6 +37,7 @@ import {
   spherePaths,
   talentDefinitions,
   maxChargeForSphere,
+  xpLevelThresholds,
   toggleConnection,
   startSession,
   unequipGlyph,
@@ -119,6 +120,15 @@ const spherePosition = (index: number, total: number) => {
 
 const activeDomainSpheres = () => domainSpheres(state);
 const pathLabel = (path: SpherePath) => (path === "Bloom" ? "Target" : path);
+const nextLevelXp = (sphere: Sphere) => xpLevelThresholds[sphere.level] ?? null;
+const levelProgressCopy = (sphere: Sphere) => {
+  const nextXp = nextLevelXp(sphere);
+  return nextXp
+    ? `Level ${sphere.level}, ${oneDecimal(Math.max(0, nextXp - sphere.xp))} XP to level ${sphere.level + 1}`
+    : `Level ${sphere.level}, max shown track`;
+};
+const centerUpgradeCopy = (sphere: Sphere) =>
+  `Upgrade to level ${sphere.level + 1}: cost floor(120 × ${sphere.level}^1.65) = ${round(sphereLevelCost(sphere))}. Gives rest multiplier +0.05.`;
 const selectedSphere = () => {
   const spheres = activeDomainSpheres();
   const candidate = state.spheres.find(
@@ -251,7 +261,7 @@ const renderSigil = (spheres: Sphere[]) => {
       </button>
       ${spheres.map((sphere, index) => renderDomainSphere(sphere, index, totalSlots)).join("")}
       ${spheres.length < 10 && canUnlockSlot ? renderLockedSlot(spheres.length, totalSlots, nextSlotCost) : ""}
-      ${state.activeSession ? renderSessionDock() : lastCompletion ? renderCompletionFeedback(lastCompletion) : ""}
+      ${lastCompletion ? renderCompletionFeedback(lastCompletion) : ""}
     </section>`;
 };
 
@@ -263,18 +273,26 @@ const renderEconomyDock = (spheres: Sphere[]) => {
   const active = state.activeSession
     ? state.spheres.find((sphere) => sphere.id === state.activeSession?.sphereId)
     : null;
+  const activeRate = active
+    ? active.kind === "domain"
+      ? routedSphereRates(state, active).activePerMinute
+      : centerRecoveryMultiplier(state)
+    : 0;
+  const currentGain = active
+    ? `${oneDecimal(activeRate + passiveRate / 60)}/m`
+    : `${oneDecimal(passiveRate)}/h`;
   return `
     <aside class="economy-dock" aria-label="Snowball economy">
       <div><span>Energy</span><strong>${round(state.game.energy)}</strong></div>
       <div><span>XP</span><strong>${round(state.game.experience)}</strong></div>
+      <div><span>Gain</span><strong>+${currentGain}</strong></div>
       <div><span>Idle</span><strong>${round(passiveRate)}/h</strong></div>
-      ${active ? `<div class="active-chip"><span>Active</span><strong>${active.name}</strong></div>` : ""}
+      <div class="active-chip ${active ? "" : "is-idle"}"><span>Active</span><strong>${active?.name ?? "None"}</strong></div>
     </aside>`;
 };
 
 const renderSphereFocus = (sphere: Sphere | null) => {
   if (!sphere) return "";
-  const ritual = getRitual(state, sphere.activeRitualId);
   const progress = sphereProgress(sphere);
   const rates =
     sphere.kind === "domain"
@@ -284,17 +302,13 @@ const renderSphereFocus = (sphere: Sphere | null) => {
   return `
     <section class="focus-panel" style="--sphere-color: ${sphere.color}">
       <div class="focus-heading"><p class="kicker">${sphere.kind === "center" ? "Rest" : dailyState(sphere)}</p><h1>${sphere.name}</h1></div>
-      <nav class="layer-tabs" aria-label="${sphere.name} focus"><button class="${focusLayer === "activity" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="activity"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5" /><path d="M8 2.5v-1M8 14.5v-1M2.5 8h-1M14.5 8h-1M4.4 4.4l-.7-.7M12.3 12.3l-.7-.7M4.4 11.6l-.7.7M12.3 3.7l-.7.7" /></svg><span>Today</span></button><button class="${focusLayer === "game" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="game"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L14 6v4L8 14 2 10V6z" /><path d="M8 6l3 2-3 2-3-2z" /><path d="M2 6l6 4M14 6l-6 4" /></svg><span>Game</span></button></nav>
+      ${renderLayerTabs(sphere)}
       ${
         focusLayer === "activity"
           ? `<div class="sphere-layer sphere-activity-layer">
               <div class="progress-lens" aria-label="${percent(progress)} daily target"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Done" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
-              <div class="start-cluster">
-                <div><span>Action</span><strong>${ritual?.name ?? "Start"}${ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</strong></div>
-                <button data-action="start-session" data-sphere-id="${sphere.id}">${state.activeSession ? "Running" : sphere.kind === "center" ? "Rest" : "Start"}</button>
-              </div>
               <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>${sphere.kind === "domain" ? "Pts" : "Gain"}</dt><dd>${sphere.kind === "domain" ? sphere.availablePoints : `${rates.activePerMinute.toFixed(1)}/m`}</dd></div></dl>
-              ${renderRitualHotbar(sphere)}
+              <p class="mechanic-line">${sphere.kind === "domain" ? `Progress = today minutes ÷ ${sphere.dailyTargetMinutes}m. ${levelProgressCopy(sphere)}.` : `Rest energy = minutes × ${centerRecoveryMultiplier(state).toFixed(2)}. Rest also raises every node's momentum by 1 to 4.`}</p>
               <div class="panel-actions">${sphere.kind === "domain" ? `<button class="quiet icon-button" data-action="show-edit-sphere" data-sphere-id="${sphere.id}" aria-label="Edit ${sphere.name}" title="Edit">✎</button>` : ""}</div>
               ${renderSphereTraces(sphere)}
             </div>`
@@ -339,11 +353,11 @@ const renderSphereGameLayer = (sphere: Sphere) => {
       : "";
   const activePanel =
     sphere.kind === "center"
-      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Rest node</span><p>Rest raises output.</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Upgrade · ${round(levelCost)}</button></section>`
+      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Rest node · level ${sphere.level}</span><p>${centerUpgradeCopy(sphere)}</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Upgrade to Lv ${sphere.level + 1} · ${round(levelCost)}</button></section>`
       : latticePanel === "route" && connection
-        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"}.` : "Paused."}</p></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`
+        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"}. Active route boosts target output 1.25×, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Flow can reduce that loss.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`
         : latticePanel === "glyphs"
-          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Equip one modifier.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}</select></label></section>`
+          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots unlock at levels 1, 4, and 7. Equipped mods alter the formulas below immediately.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
           : renderProgressionPanel(sphere);
   return `<div class="sphere-layer sphere-game-layer">
     <section class="lattice-summary" aria-label="Game effect for ${sphere.name}">
@@ -351,25 +365,40 @@ const renderSphereGameLayer = (sphere: Sphere) => {
       <span><b>Idle</b> ${rates.passivePerHour.toFixed(1)}/h</span>
       <span><b>${sphere.kind === "domain" ? "Pts" : "Rest"}</b> ${sphere.kind === "domain" ? sphere.availablePoints : `×${centerRecoveryMultiplier(state).toFixed(2)}`}</span>
     </section>
+    ${sphere.kind === "domain" ? renderMechanicsBrief(sphere, rates.activePerMinute, rates.passivePerHour) : `<p class="mechanic-line">Rest multiplier = 1 + (center level - 1) × 0.05. Current: ×${centerRecoveryMultiplier(state).toFixed(2)}.</p>`}
     ${panelNav}
     ${activePanel}
   </div>`;
 };
 
-const renderRitualHotbar = (sphere: Sphere) => {
+const renderLayerTabs = (sphere: Sphere | null) => `
+  <nav class="layer-tabs" aria-label="${sphere?.name ?? "Sphere"} focus">
+    <button class="${focusLayer === "activity" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="activity" ${sphere ? "" : "disabled"}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5" /><path d="M8 2.5v-1M8 14.5v-1M2.5 8h-1M14.5 8h-1M4.4 4.4l-.7-.7M12.3 12.3l-.7-.7M4.4 11.6l-.7.7M12.3 3.7l-.7.7" /></svg><span>Today</span></button>
+    <button class="${focusLayer === "game" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="game" ${sphere ? "" : "disabled"}><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L14 6v4L8 14 2 10V6z" /><path d="M8 6l3 2-3 2-3-2z" /><path d="M2 6l6 4M14 6l-6 4" /></svg><span>Game</span></button>
+  </nav>`;
+
+const renderRitualHotbar = (sphere: Sphere, activeRitualId = sphere.activeRitualId) => {
   const rituals = activeRitualsForSphere(state, sphere.id).filter((ritual) => ritual.isFavorite);
   return `<div class="ritual-hotbar" aria-label="${sphere.name} rituals">${rituals
     .map(
       (ritual) =>
-        `<span class="ritual-wrap"><button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</button><button class="ritual-edit" data-action="show-edit-ritual" data-ritual-id="${ritual.id}" aria-label="Edit ${ritual.name}">✎</button></span>`,
+        `<span class="ritual-wrap"><button class="ritual-chip ${ritual.id === activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</button><button class="ritual-edit" data-action="show-edit-ritual" data-ritual-id="${ritual.id}" aria-label="Edit ${ritual.name}">✎</button></span>`,
     )
     .join(
       "",
     )}<button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Action</button></div>`;
 };
 
+const renderMechanicsBrief = (sphere: Sphere, activePerMinute: number, passivePerHour: number) => `
+  <section class="mechanics-brief" aria-label="${sphere.name} formulas">
+    <div><b>Active energy</b><span>minutes × ${activePerMinute.toFixed(1)}/m. Rate = (1 + momentum%) × level × 6 × route/mod bonuses.</span></div>
+    <div><b>Idle energy</b><span>${passivePerHour.toFixed(1)}/h. Rate = 0.001 × level × (0.25 + momentum%) × bonuses × 3600.</span></div>
+    <div><b>Target reward</b><span>First daily hit gives ${sphere.dailyTargetMinutes} × 2 energy, then Bloom/mod bonuses. Momentum +15.</span></div>
+    <div><b>XP and points</b><span>XP = minutes. ${levelProgressCopy(sphere)}. Each level after 1 grants 1 point.</span></div>
+  </section>`;
+
 const renderProgressionPanel = (sphere: Sphere) => {
-  const nextXp = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500][sphere.level] ?? null;
+  const nextXp = nextLevelXp(sphere);
   const respecCost = sphere.firstRespecUsed ? 25 * sphere.spentPoints : 0;
   return `<section class="lattice-section progression-panel">
     <div class="lattice-section-copy"><span>Upgrade</span><p>Spend points. Reset later.</p></div>
@@ -427,24 +456,37 @@ const renderCompletionFeedback = (feedback: CompletionFeedback) => {
   </aside>`;
 };
 
-const renderSessionDock = () => {
+const renderSessionToolbar = (sphere: Sphere | null) => {
   const active = state.activeSession;
-  if (!active) return "";
-  const sphere = state.spheres.find((item) => item.id === active.sphereId);
-  const ritual = getRitual(state, active.ritualId);
+  const toolbarSphere = active ? state.spheres.find((item) => item.id === active.sphereId) : sphere;
+  const ritual = active
+    ? getRitual(state, active.ritualId)
+    : getRitual(state, toolbarSphere?.activeRitualId ?? null);
   const elapsed = activeElapsedSeconds();
-  const targetSeconds = ritual?.targetMinutes ? ritual.targetMinutes * 60 : null;
+  const targetSeconds = active && ritual?.targetMinutes ? ritual.targetMinutes * 60 : null;
   const targetComplete = targetSeconds !== null && elapsed >= targetSeconds;
-  if (targetComplete) timerCompletedSessionId = active.id;
-  const displaySeconds = targetSeconds ? Math.max(0, targetSeconds - elapsed) : elapsed;
-  const progress = targetSeconds ? clamp((elapsed / targetSeconds) * 100, 0, 100) : 100;
+  if (active && targetComplete) timerCompletedSessionId = active.id;
+  const displaySeconds = active
+    ? targetSeconds
+      ? Math.max(0, targetSeconds - elapsed)
+      : elapsed
+    : 0;
+  const progress =
+    active && targetSeconds
+      ? clamp((elapsed / targetSeconds) * 100, 0, 100)
+      : sphere
+        ? sphereProgress(sphere)
+        : 0;
   return `
-    <section class="session-sheet ${targetComplete ? "target-complete" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: ${progress}%" aria-labelledby="session-title">
-      <div class="session-orb" aria-hidden="true"><span></span></div>
-      <div class="session-copy"><p class="kicker">Running</p><h2 id="session-title">${sphere?.name ?? "Session"}</h2><p>${ritual?.name ?? "Start"}</p></div>
-      <div class="session-time"><div class="timer">${formatDuration(displaySeconds)}</div><p class="timer-mode">${targetComplete ? "Target hit" : targetSeconds ? "Down" : "Up"}</p></div>
-      ${targetComplete ? `<div class="timer-complete-alert" role="status" aria-live="assertive">Target hit. Log when done.</div>` : ""}
-      <button data-action="finish-session">${targetComplete ? "Log" : "Stop"}</button>
+    <section class="session-toolbar ${active ? "is-running" : "is-ready"} ${targetComplete ? "target-complete" : ""}" style="--sphere-color: ${toolbarSphere?.color ?? "oklch(77% 0.15 196)"}; --progress: ${progress}%" aria-label="Session management">
+      <div class="session-toolbar-node">
+        <span class="toolbar-orb" aria-hidden="true"><span></span></span>
+        <div><p class="kicker">${active ? (targetComplete ? "Target hit" : "Running") : "Ready"}</p><strong>${toolbarSphere?.name ?? "Pick node"}</strong><small>${ritual?.name ?? "Start"}${!active && ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</small></div>
+      </div>
+      ${toolbarSphere ? renderRitualHotbar(toolbarSphere, active ? active.ritualId : toolbarSphere.activeRitualId) : ""}
+      <div class="session-toolbar-control">
+        ${active ? `<div class="toolbar-timer"><span>${formatDuration(displaySeconds)}</span><small>${targetComplete ? "Target hit" : targetSeconds ? "Down" : "Up"}</small></div><button data-action="finish-session">${targetComplete ? "Log" : "Stop"}</button>` : `<button data-action="start-session" data-sphere-id="${toolbarSphere?.id ?? ""}" ${toolbarSphere ? "" : "disabled"}>${toolbarSphere?.kind === "center" ? "Rest" : "Start"}</button>`}
+      </div>
     </section>`;
 };
 
@@ -459,6 +501,7 @@ const renderHome = () => {
         ${renderEconomyDock(spheres)}
         <button class="settings-button quiet" type="button" data-action="open-settings" aria-label="Settings" title="Settings">⚙</button>
       </header>
+      ${renderSessionToolbar(selected)}
       <div class="home-grid">${renderSigil(spheres)}${renderSphereFocus(selected)}</div>
       <input id="${backupInputId}" class="visually-hidden" type="file" accept="application/json,.json" />
       ${renderModalLayers()}
@@ -684,7 +727,10 @@ app.addEventListener("click", async (event) => {
   if (action === "set-active-ritual") {
     const sphereId = actionElement.dataset.sphereId;
     const ritualId = actionElement.dataset.ritualId;
-    if (sphereId && ritualId) setActiveRitual(state, sphereId, ritualId);
+    if (sphereId && ritualId) {
+      setActiveRitual(state, sphereId, ritualId);
+      if (state.activeSession?.sphereId === sphereId) state.activeSession.ritualId = ritualId;
+    }
     persistState();
     render();
   }

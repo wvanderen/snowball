@@ -27,7 +27,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Flow",
     rank: 1,
     name: "Smooth Current",
-    description: "Outgoing Energy from this sphere +5%.",
+    description: "Output +5%.",
     effects: [{ type: "MULTIPLY_OUTGOING_ENERGY", value: 0.05 }],
   },
   {
@@ -35,7 +35,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Flow",
     rank: 2,
     name: "Open Channel",
-    description: "Routing loss from this sphere reduced by 5%.",
+    description: "Route loss -5%.",
     effects: [{ type: "REDUCE_ROUTING_LOSS", value: 0.05 }],
   },
   {
@@ -43,7 +43,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Flow",
     rank: 3,
     name: "Live Conduit",
-    description: "While this sphere is active, connected edges gain +15% throughput.",
+    description: "Active route +15%.",
     effects: [{ type: "ACTIVE_EDGE_THROUGHPUT_BONUS", value: 0.15 }],
   },
   {
@@ -51,7 +51,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Charge",
     rank: 1,
     name: "Vessel",
-    description: "Store 5% of incoming Energy as Charge.",
+    description: "Store 5% input.",
     effects: [{ type: "STORE_INCOMING_ENERGY_AS_CHARGE", value: 0.05 }],
   },
   {
@@ -67,7 +67,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Charge",
     rank: 3,
     name: "Release",
-    description: "Daily Bloom releases stored Charge toward Center.",
+    description: "Target dumps charge.",
     effects: [{ type: "RELEASE_CHARGE_ON_MILESTONE", value: 1 }],
   },
   {
@@ -75,7 +75,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Bloom",
     rank: 1,
     name: "First Petal",
-    description: "Milestone Bloom Energy +10%.",
+    description: "Target energy +10%.",
     effects: [{ type: "MULTIPLY_MILESTONE_BLOOM", value: 0.1 }],
   },
   {
@@ -83,7 +83,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Bloom",
     rank: 2,
     name: "Spillover",
-    description: "Blooms feed connected spheres with 5% of Bloom Energy.",
+    description: "Route 5% target energy.",
     effects: [{ type: "BLOOM_NEIGHBOR_ENERGY_SHARE", value: 0.05 }],
   },
   {
@@ -91,7 +91,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Bloom",
     rank: 3,
     name: "Partial Bloom",
-    description: "The first session of the day grants a small Bloom.",
+    description: "First run bonus.",
     effects: [{ type: "FIRST_SESSION_MINI_BLOOM", value: 0.15 }],
   },
   {
@@ -99,7 +99,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Anchor",
     rank: 1,
     name: "Weight",
-    description: "Momentum decay for this sphere reduced by 5%.",
+    description: "Decay -5%.",
     effects: [{ type: "REDUCE_MOMENTUM_DECAY", value: 0.05 }],
   },
   {
@@ -107,7 +107,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Anchor",
     rank: 2,
     name: "Root",
-    description: "Minimum Momentum for this sphere +5.",
+    description: "Momentum floor +5.",
     effects: [{ type: "INCREASE_MOMENTUM_FLOOR", value: 5 }],
   },
   {
@@ -115,7 +115,7 @@ export const talentDefinitions: TalentDefinition[] = [
     path: "Anchor",
     rank: 3,
     name: "Return Path",
-    description: "First session after inactivity grants +10 Momentum.",
+    description: "Return +10 momentum.",
     effects: [{ type: "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS", value: 10 }],
   },
 ];

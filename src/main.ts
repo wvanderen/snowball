@@ -101,12 +101,12 @@ const sphereProgress = (sphere: Sphere) => {
 };
 
 const dailyState = (sphere: Sphere) => {
-  if (sphere.milestoneCompletedDate === sphere.dailyProgressDate) return "bloomed";
+  if (sphere.milestoneCompletedDate === sphere.dailyProgressDate) return "done";
   const progress = sphereProgress(sphere);
-  if (progress >= 70) return "near bloom";
-  if (progress > 0) return "in motion";
-  if (sphere.momentum < 35) return "rekindle";
-  return "ready";
+  if (progress >= 70) return "70%+";
+  if (progress > 0) return "active";
+  if (sphere.momentum < 35) return "low";
+  return "idle";
 };
 
 const spherePosition = (index: number, total: number) => {
@@ -118,6 +118,7 @@ const spherePosition = (index: number, total: number) => {
 };
 
 const activeDomainSpheres = () => domainSpheres(state);
+const pathLabel = (path: SpherePath) => (path === "Bloom" ? "Target" : path);
 const selectedSphere = () => {
   const spheres = activeDomainSpheres();
   const candidate = state.spheres.find(
@@ -133,23 +134,23 @@ const renderCreateOrEditSphereForm = (sphere: Sphere | null) => {
   const canUnlock = canUnlockSphereSlot(state);
   return `
     <section class="form-panel" role="dialog" aria-labelledby="sphere-form-title">
-      <p class="kicker">${sphere ? "Tune sphere" : isFirstRun ? "First node" : "Grow sigil"}</p>
-      <h1 id="sphere-form-title">${sphere ? sphere.name : isFirstRun ? "Plant your first sphere" : "Unlock a new orbit"}</h1>
+      <p class="kicker">${sphere ? "Edit" : isFirstRun ? "First node" : "New node"}</p>
+      <h1 id="sphere-form-title">${sphere ? sphere.name : isFirstRun ? "Add node" : "Add node"}</h1>
       <p class="lede">${
         sphere
-          ? "Rename the life domain, tune its daily bloom target, or adjust its color identity."
+          ? "Name, target, color."
           : isFirstRun
-            ? "Choose one domain you want to keep in motion. You can start a ritual as soon as it appears."
-            : `A new slot costs ${round(slotCost)} energy. Add one when your life actually needs another node.`
+            ? "Pick one domain. Start immediately."
+            : `Cost: ${round(slotCost)} energy.`
       }</p>
       <form id="${sphere ? "edit-sphere-form" : "create-sphere-form"}" class="sphere-form" ${sphere ? `data-sphere-id="${sphere.id}"` : ""}>
-        <label>Sphere name<input name="name" autocomplete="off" placeholder="Music" required maxlength="32" value="${sphere?.name ?? ""}" /></label>
-        <label>Daily bloom target<div class="inline-input"><input name="target" type="number" min="1" max="240" value="${sphere?.dailyTargetMinutes ?? 20}" required /><span>minutes</span></div></label>
+        <label>Name<input name="name" autocomplete="off" placeholder="Music" required maxlength="32" value="${sphere?.name ?? ""}" /></label>
+        <label>Daily target<div class="inline-input"><input name="target" type="number" min="1" max="240" value="${sphere?.dailyTargetMinutes ?? 20}" required /><span>min</span></div></label>
         <label>Color<input name="color" type="color" value="${sphere?.color ?? "#8bd8ff"}" /></label>
         <div class="form-actions">
-          ${sphere ? `<button type="button" class="quiet danger" data-action="archive-sphere" data-sphere-id="${sphere.id}">Archive sphere</button>` : ""}
-          ${isFirstRun ? "" : `<button type="button" class="quiet" data-action="${sphere ? "cancel-edit-sphere" : "cancel-create-sphere"}">Keep lattice</button>`}
-          <button type="submit" ${!sphere && !canUnlock ? "disabled" : ""}>${sphere ? "Save sphere" : isFirstRun ? "Create sphere" : `Spend ${round(slotCost)} energy`}</button>
+          ${sphere ? `<button type="button" class="quiet danger" data-action="archive-sphere" data-sphere-id="${sphere.id}">Archive</button>` : ""}
+          ${isFirstRun ? "" : `<button type="button" class="quiet" data-action="${sphere ? "cancel-edit-sphere" : "cancel-create-sphere"}">Cancel</button>`}
+          <button type="submit" ${!sphere && !canUnlock ? "disabled" : ""}>${sphere ? "Save" : isFirstRun ? "Create" : `Spend ${round(slotCost)}`}</button>
         </div>
       </form>
     </section>`;
@@ -158,12 +159,12 @@ const renderCreateOrEditSphereForm = (sphere: Sphere | null) => {
 const renderRitualForm = (sphere: Sphere) => `
   <section class="form-panel" role="dialog" aria-labelledby="ritual-form-title">
     <p class="kicker">${sphere.name}</p>
-    <h1 id="ritual-form-title">Add a ritual</h1>
-    <p class="lede">Rituals are quick-start activities inside a sphere. The newest ritual becomes active immediately.</p>
+    <h1 id="ritual-form-title">Add action</h1>
+    <p class="lede">Quick start for this node.</p>
     <form id="create-ritual-form" class="sphere-form" data-sphere-id="${sphere.id}">
-      <label>Ritual name<input name="name" autocomplete="off" placeholder="Guitar practice" required maxlength="36" /></label>
-      <label>Optional target<div class="inline-input"><input name="target" type="number" min="1" max="240" placeholder="Count up" /><span>minutes</span></div></label>
-      <div class="form-actions"><button type="button" class="quiet" data-action="cancel-create-ritual">Keep current ritual</button><button type="submit">Add ritual</button></div>
+      <label>Name<input name="name" autocomplete="off" placeholder="Guitar" required maxlength="36" /></label>
+      <label>Target<div class="inline-input"><input name="target" type="number" min="1" max="240" placeholder="Open" /><span>min</span></div></label>
+      <div class="form-actions"><button type="button" class="quiet" data-action="cancel-create-ritual">Cancel</button><button type="submit">Add</button></div>
     </form>
   </section>`;
 
@@ -174,11 +175,11 @@ const renderEditRitualForm = (ritualId: string) => {
   return `
   <section class="form-panel" role="dialog" aria-labelledby="edit-ritual-title">
     <p class="kicker">${sphere.name}</p>
-    <h1 id="edit-ritual-title">Tune ritual</h1>
+    <h1 id="edit-ritual-title">Edit action</h1>
     <form id="edit-ritual-form" class="sphere-form" data-ritual-id="${ritual.id}">
-      <label>Ritual name<input name="name" autocomplete="off" required maxlength="36" value="${ritual.name}" /></label>
-      <label>Optional target<div class="inline-input"><input name="target" type="number" min="1" max="240" placeholder="Count up" value="${ritual.targetMinutes ?? ""}" /><span>minutes</span></div></label>
-      <div class="form-actions"><button type="button" class="quiet danger" data-action="archive-ritual" data-ritual-id="${ritual.id}">Archive ritual</button><button type="button" class="quiet" data-action="cancel-edit-ritual">Keep ritual</button><button type="submit">Save ritual</button></div>
+      <label>Name<input name="name" autocomplete="off" required maxlength="36" value="${ritual.name}" /></label>
+      <label>Target<div class="inline-input"><input name="target" type="number" min="1" max="240" placeholder="Open" value="${ritual.targetMinutes ?? ""}" /><span>min</span></div></label>
+      <div class="form-actions"><button type="button" class="quiet danger" data-action="archive-ritual" data-ritual-id="${ritual.id}">Archive</button><button type="button" class="quiet" data-action="cancel-edit-ritual">Cancel</button><button type="submit">Save</button></div>
     </form>
   </section>`;
 };
@@ -224,10 +225,10 @@ const renderDomainSphere = (sphere: Sphere, index: number, totalSlots: number) =
   const isSelected = selectedSphere()?.id === sphere.id;
   const isActive = state.activeSession?.sphereId === sphere.id;
   return `
-    <button class="sigil-node domain-node ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""} ${completion?.completedMilestone ? "just-bloomed" : ""}" data-action="select-sphere" data-sphere-id="${sphere.id}" aria-label="${sphere.name}: ${percent(progress)} bloom progress, ${Math.round(sphere.momentum)} percent momentum" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --momentum: ${Math.round(sphere.momentum)}; --x: ${position.x}%; --y: ${position.y}%">
+    <button class="sigil-node domain-node ${isSelected ? "is-selected" : ""} ${isActive ? "is-active" : ""} ${completion?.completedMilestone ? "just-bloomed" : ""}" data-action="select-sphere" data-sphere-id="${sphere.id}" aria-label="${sphere.name}: ${percent(progress)} target, ${Math.round(sphere.momentum)} percent momentum" style="--sphere-color: ${sphere.color}; --progress: ${progress}%; --momentum: ${Math.round(sphere.momentum)}; --x: ${position.x}%; --y: ${position.y}%">
       <span class="node-ring"></span>
       <span class="node-core"><span>${sphere.name}</span><small>${dailyState(sphere)}</small></span>
-      <span class="node-ritual">${ritual?.name ?? "Focus"}</span>
+      <span class="node-ritual">${ritual?.name ?? "Start"}</span>
     </button>`;
 };
 
@@ -245,8 +246,8 @@ const renderSigil = (spheres: Sphere[]) => {
     <section class="sigil-stage" aria-label="Your sphere sigil">
       <div class="sigil-orbits" aria-hidden="true"><span></span><span></span><span></span></div>
       <svg class="connection-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${renderConnectionLines(spheres, totalSlots)}</svg>
-      <button class="sigil-node center-node ${selectedSphere()?.id === centerSphereId ? "is-selected" : ""}" data-action="select-sphere" data-sphere-id="${centerSphereId}" aria-label="Center recovery sphere" style="--sphere-color: ${center.color}; --momentum: ${Math.round(center.momentum)}; --progress: ${sphereProgress(center)}%">
-        <span class="node-ring"></span><span class="node-core"><span>Center</span><small>recovery</small></span>
+      <button class="sigil-node center-node ${selectedSphere()?.id === centerSphereId ? "is-selected" : ""}" data-action="select-sphere" data-sphere-id="${centerSphereId}" aria-label="Center recovery node" style="--sphere-color: ${center.color}; --momentum: ${Math.round(center.momentum)}; --progress: ${sphereProgress(center)}%">
+        <span class="node-ring"></span><span class="node-core"><span>0</span><small>rest</small></span>
       </button>
       ${spheres.map((sphere, index) => renderDomainSphere(sphere, index, totalSlots)).join("")}
       ${spheres.length < 10 && canUnlockSlot ? renderLockedSlot(spheres.length, totalSlots, nextSlotCost) : ""}
@@ -266,7 +267,7 @@ const renderEconomyDock = (spheres: Sphere[]) => {
     <aside class="economy-dock" aria-label="Snowball economy">
       <div><span>Energy</span><strong>${round(state.game.energy)}</strong></div>
       <div><span>XP</span><strong>${round(state.game.experience)}</strong></div>
-      <div><span>Flow</span><strong>${round(passiveRate)}/h</strong></div>
+      <div><span>Idle</span><strong>${round(passiveRate)}/h</strong></div>
       ${active ? `<div class="active-chip"><span>Active</span><strong>${active.name}</strong></div>` : ""}
     </aside>`;
 };
@@ -282,19 +283,19 @@ const renderSphereFocus = (sphere: Sphere | null) => {
   const milestoneDone = sphere.milestoneCompletedDate === sphere.dailyProgressDate;
   return `
     <section class="focus-panel" style="--sphere-color: ${sphere.color}">
-      <div class="focus-heading"><p class="kicker">${sphere.kind === "center" ? "Recovery hub" : dailyState(sphere)}</p><h1>${sphere.name}</h1></div>
-      <nav class="layer-tabs" aria-label="${sphere.name} focus"><button class="${focusLayer === "activity" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="activity"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5" /><path d="M8 2.5v-1M8 14.5v-1M2.5 8h-1M14.5 8h-1M4.4 4.4l-.7-.7M12.3 12.3l-.7-.7M4.4 11.6l-.7.7M12.3 3.7l-.7.7" /></svg><span>Today</span></button><button class="${focusLayer === "game" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="game"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L14 6v4L8 14 2 10V6z" /><path d="M8 6l3 2-3 2-3-2z" /><path d="M2 6l6 4M14 6l-6 4" /></svg><span>Lattice</span></button></nav>
+      <div class="focus-heading"><p class="kicker">${sphere.kind === "center" ? "Rest" : dailyState(sphere)}</p><h1>${sphere.name}</h1></div>
+      <nav class="layer-tabs" aria-label="${sphere.name} focus"><button class="${focusLayer === "activity" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="activity"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.5" /><path d="M8 2.5v-1M8 14.5v-1M2.5 8h-1M14.5 8h-1M4.4 4.4l-.7-.7M12.3 12.3l-.7-.7M4.4 11.6l-.7.7M12.3 3.7l-.7.7" /></svg><span>Today</span></button><button class="${focusLayer === "game" ? "is-selected" : ""}" data-action="set-focus-layer" data-layer="game"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2L14 6v4L8 14 2 10V6z" /><path d="M8 6l3 2-3 2-3-2z" /><path d="M2 6l6 4M14 6l-6 4" /></svg><span>Game</span></button></nav>
       ${
         focusLayer === "activity"
           ? `<div class="sphere-layer sphere-activity-layer">
-              <div class="progress-lens" aria-label="${percent(progress)} daily bloom progress"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Bloomed" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
+              <div class="progress-lens" aria-label="${percent(progress)} daily target"><span style="--progress: ${progress}%"></span><strong>${milestoneDone ? "Done" : percent(progress)}</strong><small>${formatMinutes(sphere.todaySeconds)} / ${sphere.dailyTargetMinutes}m</small></div>
               <div class="start-cluster">
-                <div><span>Active ritual</span><strong>${ritual?.name ?? "Focus"}${ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</strong></div>
-                <button data-action="start-session" data-sphere-id="${sphere.id}">${state.activeSession ? "Session running" : sphere.kind === "center" ? "Start recovery" : "Start ritual"}</button>
+                <div><span>Action</span><strong>${ritual?.name ?? "Start"}${ritual?.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</strong></div>
+                <button data-action="start-session" data-sphere-id="${sphere.id}">${state.activeSession ? "Running" : sphere.kind === "center" ? "Rest" : "Start"}</button>
               </div>
-              <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>${sphere.kind === "domain" ? "Points" : "Gain"}</dt><dd>${sphere.kind === "domain" ? sphere.availablePoints : `${rates.activePerMinute.toFixed(1)}/m`}</dd></div></dl>
+              <dl class="focus-stats"><div><dt>Momentum</dt><dd>${Math.round(sphere.momentum)}%</dd></div><div><dt>Level</dt><dd>${sphere.level}</dd></div><div><dt>${sphere.kind === "domain" ? "Pts" : "Gain"}</dt><dd>${sphere.kind === "domain" ? sphere.availablePoints : `${rates.activePerMinute.toFixed(1)}/m`}</dd></div></dl>
               ${renderRitualHotbar(sphere)}
-              <div class="panel-actions">${sphere.kind === "domain" ? `<button class="quiet" data-action="show-edit-sphere" data-sphere-id="${sphere.id}">Tune sphere</button>` : ""}</div>
+              <div class="panel-actions">${sphere.kind === "domain" ? `<button class="quiet icon-button" data-action="show-edit-sphere" data-sphere-id="${sphere.id}" aria-label="Edit ${sphere.name}" title="Edit">✎</button>` : ""}</div>
               ${renderSphereTraces(sphere)}
             </div>`
           : renderSphereGameLayer(sphere)
@@ -304,10 +305,10 @@ const renderSphereFocus = (sphere: Sphere | null) => {
 
 const renderSphereTraces = (sphere: Sphere) => {
   const sessions = state.sessions.filter((session) => session.sphereId === sphere.id).slice(0, 5);
-  return `<section class="sphere-traces" aria-label="Recent ${sphere.name} traces"><div class="layer-section-title"><span>Recent traces</span><strong>${sessions.length}</strong></div>${
+  return `<section class="sphere-traces" aria-label="Recent ${sphere.name} traces"><div class="layer-section-title"><span>Log</span><strong>${sessions.length}</strong></div>${
     sessions.length > 0
       ? `<ol class="compact-trace-list">${sessions.map(renderSessionHistoryItem).join("")}</ol>`
-      : `<p class="empty-history">No traces for this sphere yet. Start one ritual and it will appear here.</p>`
+      : `<p class="empty-history">No runs yet.</p>`
   }</section>`;
 };
 
@@ -334,21 +335,21 @@ const renderSphereGameLayer = (sphere: Sphere) => {
   if (!availablePanels.includes(latticePanel)) latticePanel = "growth";
   const panelNav =
     sphere.kind === "domain"
-      ? `<nav class="lattice-menu" aria-label="Lattice menus"><button class="${latticePanel === "growth" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="growth"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V5" /><path d="M8 5L4 9" /><path d="M8 5l4 4" /><path d="M3 3h10" /></svg><span>Growth</span></button><button class="${latticePanel === "route" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="route"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h8" /><path d="M10 8l-3-3" /><path d="M10 8l-3 3" /><circle cx="13" cy="8" r="2" /></svg><span>Route</span></button><button class="${latticePanel === "glyphs" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="glyphs"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l1.8 5H15l-4.2 3.2 1.6 5L8 11l-4.4 3.2 1.6-5L1 6h5.2z" /></svg><span>Glyphs</span></button></nav>`
+      ? `<nav class="lattice-menu" aria-label="Game menus"><button class="${latticePanel === "growth" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="growth"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14V5" /><path d="M8 5L4 9" /><path d="M8 5l4 4" /><path d="M3 3h10" /></svg><span>Up</span></button><button class="${latticePanel === "route" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="route"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8h8" /><path d="M10 8l-3-3" /><path d="M10 8l-3 3" /><circle cx="13" cy="8" r="2" /></svg><span>Route</span></button><button class="${latticePanel === "glyphs" ? "is-selected" : ""}" data-action="set-lattice-panel" data-panel="glyphs"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1l1.8 5H15l-4.2 3.2 1.6 5L8 11l-4.4 3.2 1.6-5L1 6h5.2z" /></svg><span>Mods</span></button></nav>`
       : "";
   const activePanel =
     sphere.kind === "center"
-      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Recovery center</span><p>Rest still feeds the lattice, without becoming another obligation.</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Deepen center · ${round(levelCost)} energy</button></section>`
+      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Rest node</span><p>Rest raises output.</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Upgrade · ${round(levelCost)}</button></section>`
       : latticePanel === "route" && connection
-        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Energy route</span><p>${connection.active ? `Flowing toward ${routedTo ?? "another sphere"}.` : "Paused. Start it again when this support path matters."}</p></div><label>Send flow<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause flow" : "Resume flow"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap direction</button></div></section>`
+        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"}.` : "Paused."}</p></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`
         : latticePanel === "glyphs"
-          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Glyphs ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Small modifiers for a sphere you already understand.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add glyph<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose a glyph</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}</select></label></section>`
+          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Equip one modifier.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}</option>`).join("")}</select></label></section>`
           : renderProgressionPanel(sphere);
   return `<div class="sphere-layer sphere-game-layer">
-    <section class="lattice-summary" aria-label="Lattice effect for ${sphere.name}">
-      <span><b>Session</b> ${rates.activePerMinute.toFixed(1)}/m</span>
-      <span><b>Away</b> ${rates.passivePerHour.toFixed(1)}/h</span>
-      <span><b>${sphere.kind === "domain" ? "Points" : "Rest"}</b> ${sphere.kind === "domain" ? sphere.availablePoints : `×${centerRecoveryMultiplier(state).toFixed(2)}`}</span>
+    <section class="lattice-summary" aria-label="Game effect for ${sphere.name}">
+      <span><b>Run</b> ${rates.activePerMinute.toFixed(1)}/m</span>
+      <span><b>Idle</b> ${rates.passivePerHour.toFixed(1)}/h</span>
+      <span><b>${sphere.kind === "domain" ? "Pts" : "Rest"}</b> ${sphere.kind === "domain" ? sphere.availablePoints : `×${centerRecoveryMultiplier(state).toFixed(2)}`}</span>
     </section>
     ${panelNav}
     ${activePanel}
@@ -360,36 +361,36 @@ const renderRitualHotbar = (sphere: Sphere) => {
   return `<div class="ritual-hotbar" aria-label="${sphere.name} rituals">${rituals
     .map(
       (ritual) =>
-        `<span class="ritual-wrap"><button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</button><button class="ritual-edit" data-action="show-edit-ritual" data-ritual-id="${ritual.id}" aria-label="Edit ${ritual.name}">Tune</button></span>`,
+        `<span class="ritual-wrap"><button class="ritual-chip ${ritual.id === sphere.activeRitualId ? "is-selected" : ""}" data-action="set-active-ritual" data-sphere-id="${sphere.id}" data-ritual-id="${ritual.id}">${ritual.name}${ritual.targetMinutes ? ` · ${ritual.targetMinutes}m` : ""}</button><button class="ritual-edit" data-action="show-edit-ritual" data-ritual-id="${ritual.id}" aria-label="Edit ${ritual.name}">✎</button></span>`,
     )
     .join(
       "",
-    )}<button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Ritual</button></div>`;
+    )}<button class="ritual-chip add-chip" data-action="show-create-ritual" data-sphere-id="${sphere.id}">+ Action</button></div>`;
 };
 
 const renderProgressionPanel = (sphere: Sphere) => {
   const nextXp = [0, 15, 45, 100, 180, 300, 475, 725, 1050, 1500][sphere.level] ?? null;
   const respecCost = sphere.firstRespecUsed ? 25 * sphere.spentPoints : 0;
   return `<section class="lattice-section progression-panel">
-    <div class="lattice-section-copy"><span>Growth paths</span><p>Choose one next bend for this sphere. You can rebuild paths later.</p></div>
-    <div class="progression-summary"><span>XP ${oneDecimal(sphere.xp)}${nextXp ? ` / ${nextXp}` : ""}</span><span>Points ${sphere.availablePoints}</span><span>Stored charge ${oneDecimal(sphere.charge)} / ${oneDecimal(maxChargeForSphere(state, sphere))}</span></div>
+    <div class="lattice-section-copy"><span>Upgrade</span><p>Spend points. Reset later.</p></div>
+    <div class="progression-summary"><span>XP ${oneDecimal(sphere.xp)}${nextXp ? ` / ${nextXp}` : ""}</span><span>Pts ${sphere.availablePoints}</span><span>Charge ${oneDecimal(sphere.charge)} / ${oneDecimal(maxChargeForSphere(state, sphere))}</span></div>
     <div class="path-grid">${spherePaths
       .map((path) => {
         const rank = pathRank(sphere, path);
         const next = talentDefinitions.find(
           (talent) => talent.path === path && talent.rank === Math.min(3, rank + 1),
         );
-        return `<div class="path-column"><div><strong>${path}</strong><span>${rank}/3</span></div><p>${next?.description ?? "Path complete."}</p><button class="quiet" data-action="spend-path-point" data-sphere-id="${sphere.id}" data-path="${path}" ${sphere.availablePoints > 0 && rank < 3 ? "" : "disabled"}>${rank === 0 ? "Start path" : rank < 3 ? "Grow path" : "Complete"}</button></div>`;
+        return `<div class="path-column"><div><strong>${pathLabel(path)}</strong><span>${rank}/3</span></div><p>${next?.description ?? "Max."}</p><button class="quiet" data-action="spend-path-point" data-sphere-id="${sphere.id}" data-path="${path}" ${sphere.availablePoints > 0 && rank < 3 ? "" : "disabled"}>${rank < 3 ? "+1" : "Max"}</button></div>`;
       })
       .join("")}</div>
-    <button class="quiet" data-action="respec-sphere" data-sphere-id="${sphere.id}" ${sphere.spentPoints > 0 && state.game.energy >= respecCost ? "" : "disabled"}>Rebuild paths${respecCost > 0 ? ` · ${round(respecCost)} energy` : " · free"}</button>
+    <button class="quiet" data-action="respec-sphere" data-sphere-id="${sphere.id}" ${sphere.spentPoints > 0 && state.game.energy >= respecCost ? "" : "disabled"}>Reset${respecCost > 0 ? ` · ${round(respecCost)}` : " · free"}</button>
   </section>`;
 };
 
 const renderSessionHistoryItem = (session: Session) => {
   const sphere = state.spheres.find((item) => item.id === session.sphereId);
   const ritual = getRitual(state, session.ritualId);
-  return `<li class="history-item" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}"><span class="history-dot"></span><div><strong>${sphere?.name ?? "Archived sphere"}</strong><p>${ritual?.name ?? "Focus"} · ${formatDuration(session.durationSeconds)}${session.completedMilestoneAfterSession ? " · bloom" : ""}</p></div><time>${formatSessionTime(session.startedAt)}</time></li>`;
+  return `<li class="history-item" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}"><span class="history-dot"></span><div><strong>${sphere?.name ?? "Archived"}</strong><p>${ritual?.name ?? "Start"} · ${formatDuration(session.durationSeconds)}${session.completedMilestoneAfterSession ? " · done" : ""}</p></div><time>${formatSessionTime(session.startedAt)}</time></li>`;
 };
 
 const renderModalLayers = () =>
@@ -397,7 +398,7 @@ const renderModalLayers = () =>
 
 const renderSettingsPanel = () =>
   isSettingsOpen
-    ? `<div class="modal-scrim settings-scrim"><section class="settings-panel" role="dialog" aria-labelledby="settings-title"><div class="settings-heading"><p class="kicker">Local first</p><h1 id="settings-title">Settings</h1><button class="quiet" type="button" data-action="close-settings">Close</button></div><div class="settings-group"><h2>Data</h2><p>Your Snowball lives in this browser. Export a backup before changing devices or clearing browser data.</p><div class="settings-actions"><button class="quiet" data-action="export-backup">Export backup</button><button class="quiet" data-action="import-backup">Import backup</button></div></div><div class="settings-group danger-zone"><h2>Reset</h2><p>This clears local spheres, rituals, sessions, energy, and XP from this browser.</p><button class="quiet danger" data-action="reset">Reset local data</button></div></section></div>`
+    ? `<div class="modal-scrim settings-scrim"><section class="settings-panel" role="dialog" aria-labelledby="settings-title"><div class="settings-heading"><p class="kicker">Local</p><h1 id="settings-title">Settings</h1><button class="quiet" type="button" data-action="close-settings">Close</button></div><div class="settings-group"><h2>Data</h2><p>Stored in this browser.</p><div class="settings-actions"><button class="quiet" data-action="export-backup">Export</button><button class="quiet" data-action="import-backup">Import</button></div></div><div class="settings-group danger-zone"><h2>Reset</h2><p>Clears nodes, actions, sessions, energy, XP.</p><button class="quiet danger" data-action="reset">Reset</button></div></section></div>`
     : "";
 
 const renderEditSphereModal = () => {
@@ -420,8 +421,8 @@ const renderCompletionFeedback = (feedback: CompletionFeedback) => {
   return `
   <aside class="session-sheet completion-toast ${feedback.completedMilestone ? "is-bloom" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: 100%" role="status" aria-live="polite">
     <div class="session-orb" aria-hidden="true"><span></span></div>
-    <div class="session-copy"><p class="kicker">${feedback.completedMilestone ? "Bloom resolved" : "Session logged"}</p><h2>${formatDuration(feedback.durationSeconds)}</h2><p>${sphere?.name ?? "Session"}</p></div>
-    <div class="reward-grid"><span>XP <b>+${Math.floor(feedback.xpGained)}</b></span><span>Energy <b>+${round(feedback.energyGained)}</b></span>${feedback.completedMilestone ? `<span>Bloom <b>+${round(feedback.milestoneEnergy)}</b></span>` : ""}</div>
+    <div class="session-copy"><p class="kicker">${feedback.completedMilestone ? "Target hit" : "Logged"}</p><h2>${formatDuration(feedback.durationSeconds)}</h2><p>${sphere?.name ?? "Session"}</p></div>
+    <div class="reward-grid"><span>XP <b>+${Math.floor(feedback.xpGained)}</b></span><span>Energy <b>+${round(feedback.energyGained)}</b></span>${feedback.completedMilestone ? `<span>Target <b>+${round(feedback.milestoneEnergy)}</b></span>` : ""}</div>
     <button class="quiet" data-action="dismiss-completion">Done</button>
   </aside>`;
 };
@@ -440,10 +441,10 @@ const renderSessionDock = () => {
   return `
     <section class="session-sheet ${targetComplete ? "target-complete" : ""}" style="--sphere-color: ${sphere?.color ?? "oklch(75% 0.14 230)"}; --progress: ${progress}%" aria-labelledby="session-title">
       <div class="session-orb" aria-hidden="true"><span></span></div>
-      <div class="session-copy"><p class="kicker">Active ritual</p><h2 id="session-title">${sphere?.name ?? "Session"}</h2><p>${ritual?.name ?? "Focus"}</p></div>
-      <div class="session-time"><div class="timer">${formatDuration(displaySeconds)}</div><p class="timer-mode">${targetComplete ? "Target complete" : targetSeconds ? "Counting down" : "Counting up"}</p></div>
-      ${targetComplete ? `<div class="timer-complete-alert" role="status" aria-live="assertive">Bloom window reached. Log when you are done.</div>` : ""}
-      <button data-action="finish-session">${targetComplete ? "Resolve ritual" : "Stop and log"}</button>
+      <div class="session-copy"><p class="kicker">Running</p><h2 id="session-title">${sphere?.name ?? "Session"}</h2><p>${ritual?.name ?? "Start"}</p></div>
+      <div class="session-time"><div class="timer">${formatDuration(displaySeconds)}</div><p class="timer-mode">${targetComplete ? "Target hit" : targetSeconds ? "Down" : "Up"}</p></div>
+      ${targetComplete ? `<div class="timer-complete-alert" role="status" aria-live="assertive">Target hit. Log when done.</div>` : ""}
+      <button data-action="finish-session">${targetComplete ? "Log" : "Stop"}</button>
     </section>`;
 };
 
@@ -456,7 +457,7 @@ const renderHome = () => {
       <header class="app-header">
         <div class="brand-mark">Snowball</div>
         ${renderEconomyDock(spheres)}
-        <button class="settings-button quiet" type="button" data-action="open-settings">Settings</button>
+        <button class="settings-button quiet" type="button" data-action="open-settings" aria-label="Settings" title="Settings">⚙</button>
       </header>
       <div class="home-grid">${renderSigil(spheres)}${renderSphereFocus(selected)}</div>
       <input id="${backupInputId}" class="visually-hidden" type="file" accept="application/json,.json" />
@@ -477,7 +478,7 @@ app.addEventListener("change", async (event) => {
   if (input instanceof HTMLSelectElement && input.dataset.action === "equip-glyph") {
     const sphereId = input.dataset.sphereId;
     const glyphId = input.value;
-    if (sphereId && glyphId && equipGlyph(state, glyphId, sphereId)) lastReward = "Glyph equipped";
+    if (sphereId && glyphId && equipGlyph(state, glyphId, sphereId)) lastReward = "Mod equipped";
     persistState();
     render();
     return;
@@ -520,7 +521,7 @@ app.addEventListener("submit", (event) => {
   const data = new FormData(form);
   const rawName = data.get("name");
   const rawTarget = data.get("target");
-  const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : "Focus";
+  const name = typeof rawName === "string" && rawName.trim() ? rawName.trim() : "Run";
   const target = typeof rawTarget === "string" && rawTarget ? Number(rawTarget) : null;
   if (form.id === "create-sphere-form") {
     const rawColor = data.get("color");
@@ -530,11 +531,9 @@ app.addEventListener("submit", (event) => {
       selectedSphereId = sphere.id;
       focusLayer = "activity";
       latticePanel = "growth";
-      lastReward =
-        activeDomainSpheres().length === 1 ? "First sphere planted" : "New orbit unlocked";
+      lastReward = activeDomainSpheres().length === 1 ? "Node added" : "Slot opened";
       isCreatingSphere = false;
-    } else
-      lastReward = `Need ${round(sphereSlotCost(state))} energy to unlock the next sphere slot`;
+    } else lastReward = `Need ${round(sphereSlotCost(state))} energy`;
   }
   if (form.id === "edit-sphere-form") {
     const rawColor = data.get("color");
@@ -606,12 +605,8 @@ app.addEventListener("click", async (event) => {
     const sphere = state.spheres.find((item) => item.id === sphereId);
     if (!sphereId || !sphere) return;
     if (state.activeSession?.sphereId === sphereId)
-      return alert("Finish the active session before archiving this sphere.");
-    if (
-      confirm(
-        `Archive ${sphere.name}? Its past sessions will stay in traces, but it will leave the active sigil.`,
-      )
-    ) {
+      return alert("Stop the run before archiving this node.");
+    if (confirm(`Archive ${sphere.name}? Past logs stay.`)) {
       archiveDomainSphere(state, sphereId);
       editingSphereId = null;
       selectedSphereId = null;
@@ -640,8 +635,8 @@ app.addEventListener("click", async (event) => {
     const ritual = getRitual(state, ritualId ?? null);
     if (!ritualId || !ritual) return;
     if (state.activeSession?.ritualId === ritualId)
-      return alert("Finish the active session before archiving this ritual.");
-    if (confirm(`Archive ${ritual.name}? Past sessions will stay in traces.`)) {
+      return alert("Stop the run before archiving this action.");
+    if (confirm(`Archive ${ritual.name}? Past logs stay.`)) {
       archiveRitual(state, ritualId);
       editingRitualId = null;
       persistState();
@@ -650,13 +645,13 @@ app.addEventListener("click", async (event) => {
   }
   if (action === "unequip-glyph") {
     const glyphId = actionElement.dataset.glyphId;
-    if (glyphId && unequipGlyph(state, glyphId)) lastReward = "Glyph unequipped";
+    if (glyphId && unequipGlyph(state, glyphId)) lastReward = "Mod removed";
     persistState();
     render();
   }
   if (action === "level-sphere") {
     const sphereId = actionElement.dataset.sphereId;
-    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Center deepened";
+    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Center upgraded";
     persistState();
     render();
   }
@@ -664,13 +659,13 @@ app.addEventListener("click", async (event) => {
     const sphereId = actionElement.dataset.sphereId;
     const path = actionElement.dataset.path;
     if (sphereId && path && spendSpherePoint(state, sphereId, path as SpherePath))
-      lastReward = "Sphere path grown";
+      lastReward = "Path +1";
     persistState();
     render();
   }
   if (action === "respec-sphere") {
     const sphereId = actionElement.dataset.sphereId;
-    if (sphereId && respecSphere(state, sphereId)) lastReward = "Sphere reshaped";
+    if (sphereId && respecSphere(state, sphereId)) lastReward = "Reset";
     persistState();
     render();
   }

@@ -2427,3 +2427,416 @@ input[type="color"] {
   border-color: color-mix(in srgb, var(--sphere-color), transparent 32%);
   box-shadow: 0 0 8px color-mix(in srgb, var(--sphere-color), transparent 62%);
 }
+
+/* Arcade math terminal pass: compact, geometric, low-copy */
+:root {
+  --ink-0: oklch(94% 0.018 244);
+  --ink-1: oklch(82% 0.025 244);
+  --ink-2: oklch(65% 0.035 244);
+  --ink-3: oklch(49% 0.04 244);
+  --void-0: oklch(7% 0.028 252);
+  --void-1: oklch(10% 0.032 252);
+  --void-2: oklch(13% 0.038 252);
+  --void-3: oklch(17% 0.045 252);
+  --line: oklch(54% 0.08 232 / 0.34);
+  --line-soft: oklch(54% 0.08 232 / 0.18);
+  --accent: oklch(77% 0.15 196);
+  --panel: oklch(10% 0.03 252 / 0.92);
+  --panel-strong: oklch(11% 0.034 252 / 0.96);
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+}
+
+body {
+  background:
+    linear-gradient(oklch(68% 0.11 196 / 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(68% 0.11 196 / 0.04) 1px, transparent 1px),
+    radial-gradient(circle at 50% 42%, oklch(42% 0.11 278 / 0.18), transparent 30rem),
+    linear-gradient(180deg, oklch(9% 0.034 252), oklch(5% 0.025 252));
+  background-size:
+    28px 28px,
+    28px 28px,
+    auto,
+    auto;
+}
+
+body::before {
+  background-image: linear-gradient(
+    90deg,
+    transparent 49%,
+    oklch(80% 0.1 196 / 0.05) 50%,
+    transparent 51%
+  );
+  background-size: 7px 100%;
+  mask-image: none;
+  opacity: 0.45;
+}
+
+button,
+input,
+select,
+.kicker,
+.economy-dock span,
+.start-cluster span,
+.focus-stats dt,
+.lattice-summary b,
+.lattice-section-copy span,
+.lattice-section label,
+.timer,
+.node-core small,
+.node-ritual {
+  font-family: ui-monospace, "SFMono-Regular", "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+
+button {
+  min-height: 38px;
+  border-radius: 4px;
+  border-color: oklch(74% 0.12 196 / 0.42);
+  padding: 0 var(--space-4);
+  background: oklch(74% 0.14 196);
+  box-shadow: inset 0 -2px 0 oklch(13% 0.05 252 / 0.35);
+  letter-spacing: 0.02em;
+}
+
+button:hover:not(.sigil-node) {
+  transform: none;
+  filter: none;
+  box-shadow:
+    inset 0 -2px 0 oklch(13% 0.05 252 / 0.35),
+    0 0 0 2px oklch(74% 0.14 196 / 0.16);
+}
+
+select,
+input {
+  min-height: 38px;
+  border-radius: 4px;
+  background: oklch(6% 0.024 252 / 0.96);
+}
+
+.app-shell {
+  gap: var(--space-3);
+  max-width: 1180px;
+  padding: max(var(--space-3), env(safe-area-inset-top)) var(--space-3)
+    max(var(--space-3), env(safe-area-inset-bottom));
+}
+
+.app-header,
+.focus-panel,
+.form-panel,
+.session-sheet,
+.completion-toast,
+.toast,
+.settings-panel {
+  box-shadow:
+    inset 0 0 0 1px oklch(90% 0.02 244 / 0.035),
+    0 2px 0 oklch(2% 0.01 252 / 0.52);
+  backdrop-filter: none;
+}
+
+.app-header {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.brand-mark {
+  font-family: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.settings-button {
+  min-width: 38px;
+  padding-inline: 0;
+}
+
+.economy-dock {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.economy-dock div {
+  min-width: 5.2rem;
+  border-radius: 0;
+  padding: var(--space-1) var(--space-3);
+  background: transparent;
+  box-shadow: inset -1px 0 0 var(--line-soft);
+}
+
+.economy-dock div:last-child {
+  box-shadow: none;
+}
+
+.economy-dock strong,
+.start-cluster strong,
+.focus-stats dd {
+  font-size: 1rem;
+  text-shadow: none;
+}
+
+.home-grid {
+  gap: var(--space-3);
+}
+
+.sigil-stage {
+  min-height: 500px;
+  border-radius: 8px;
+  background:
+    linear-gradient(oklch(72% 0.11 196 / 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, oklch(72% 0.11 196 / 0.03) 1px, transparent 1px),
+    radial-gradient(circle at 50% 50%, oklch(18% 0.06 258), oklch(7% 0.025 252) 72%);
+  background-size:
+    22px 22px,
+    22px 22px,
+    auto;
+  box-shadow:
+    inset 0 0 0 1px oklch(90% 0.02 244 / 0.035),
+    inset 0 0 44px oklch(2% 0.01 252 / 0.55);
+}
+
+.sigil-stage::before,
+.sigil-stage::after,
+.sigil-orbits span {
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.route-line {
+  stroke-width: 1px;
+  stroke-dasharray: 3 4;
+}
+
+.route-shadow,
+.flow-particle {
+  display: none;
+}
+
+.sigil-node {
+  width: clamp(76px, 18vw, 118px);
+  height: clamp(76px, 18vw, 118px);
+}
+
+.center-node {
+  width: clamp(96px, 21vw, 136px);
+  height: clamp(96px, 21vw, 136px);
+}
+
+.node-ring,
+.node-ring::after,
+.node-core {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.node-ring {
+  background:
+    conic-gradient(
+      color-mix(in srgb, var(--sphere-color), white 8%) var(--progress),
+      oklch(26% 0.045 252 / 0.65) 0
+    ),
+    oklch(8% 0.026 252);
+  filter: none;
+}
+
+.node-ring::after {
+  inset: 6px;
+  background: oklch(7% 0.024 252);
+}
+
+.node-core {
+  width: 68%;
+  height: 68%;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--sphere-color), white 10%),
+    color-mix(in srgb, var(--sphere-color), black 52%)
+  );
+  box-shadow:
+    inset 0 -10px 0 oklch(3% 0.018 252 / 0.24),
+    0 0 0 1px color-mix(in srgb, var(--sphere-color), transparent 30%);
+}
+
+.node-core span {
+  font-size: clamp(0.72rem, 1.9vw, 0.92rem);
+  letter-spacing: -0.02em;
+}
+
+.node-core small,
+.node-ritual {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+}
+
+.node-ritual {
+  bottom: -6px;
+  max-width: 92px;
+  border-radius: 3px;
+  padding: 2px 6px;
+  background: oklch(6% 0.024 252 / 0.94);
+}
+
+.focus-panel {
+  gap: var(--space-3);
+  border-radius: 8px;
+  padding: var(--space-4);
+  background: var(--panel-strong);
+}
+
+.focus-panel h1,
+.form-panel h1,
+.settings-heading h1 {
+  font-size: 1.55rem;
+  letter-spacing: -0.025em;
+}
+
+.kicker {
+  color: color-mix(in srgb, var(--sphere-color, var(--accent)), var(--ink-0) 28%);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-shadow: none;
+}
+
+.lede {
+  max-width: 36ch;
+  margin: var(--space-2) 0 var(--space-4);
+}
+
+.sphere-activity-layer .progress-lens,
+.start-cluster,
+.sphere-traces,
+.lattice-section,
+.sphere-game-layer .route-row,
+.sphere-game-layer .glyph-row,
+.path-column {
+  border-radius: 4px;
+  background:
+    linear-gradient(
+      90deg,
+      color-mix(in srgb, var(--sphere-color), transparent 88%),
+      transparent 70%
+    ),
+    oklch(6% 0.024 252 / 0.86);
+  box-shadow: inset 0 0 0 1px oklch(90% 0.02 244 / 0.025);
+}
+
+.sphere-activity-layer .progress-lens {
+  min-height: 74px;
+  padding: var(--space-3);
+}
+
+.sphere-activity-layer .progress-lens strong {
+  font-size: 1.25rem;
+  text-shadow: none;
+}
+
+.start-cluster {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+}
+
+.focus-stats,
+.lattice-summary {
+  padding-block: var(--space-1);
+}
+
+.focus-stats div,
+.lattice-summary span {
+  min-width: 4.6rem;
+  padding-inline: var(--space-2);
+}
+
+.ritual-hotbar {
+  gap: var(--space-1);
+}
+
+.ritual-wrap,
+.ritual-chip,
+.ritual-edit,
+.add-chip,
+.panel-actions .quiet,
+.glyph-chip,
+.quiet {
+  border-radius: 3px;
+}
+
+.ritual-chip,
+.ritual-edit,
+.glyph-chip,
+.quiet {
+  min-height: 32px;
+}
+
+.icon-button,
+.ritual-edit {
+  min-width: 32px;
+  padding-inline: 0;
+}
+
+.sphere-traces {
+  padding: var(--space-2);
+}
+
+.history-item {
+  grid-template-columns: 0.5rem 1fr auto;
+  gap: var(--space-2);
+  padding: var(--space-2);
+}
+
+.layer-tabs button,
+.lattice-menu button {
+  min-height: 30px;
+}
+
+.lattice-section {
+  padding: var(--space-3);
+}
+
+.lattice-section-copy p,
+.path-column p,
+.empty-history,
+.settings-group p {
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.path-column {
+  grid-template-columns: 4.5rem minmax(0, 1fr) 42px;
+}
+
+.form-panel,
+.settings-panel {
+  border-radius: 8px;
+  padding: var(--space-4);
+}
+
+@media (min-width: 920px) {
+  .home-grid {
+    grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.72fr);
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 720px) {
+  .app-header {
+    grid-template-columns: 1fr auto;
+  }
+
+  .economy-dock {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .sigil-stage {
+    min-height: 430px;
+  }
+}

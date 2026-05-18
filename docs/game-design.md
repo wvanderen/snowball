@@ -29,13 +29,15 @@ The real-world action is the generator. The game exists to make returning to tha
 
 ## Reward rules v0
 
-### XP
+### Sphere XP
+
+Global XP is deprecated. XP is local to the sphere being practiced.
 
 ```txt
-xpGained = focusedMinutes
+sphereXpGained = focusedMinutes
 ```
 
-XP represents real effort and should remain mostly unscaled.
+XP represents real effort and should remain mostly grounded in time. Late-game glyphs or upgrades may add balanced Sphere XP bonuses, especially through Momentum synergies, but these should accelerate practice rather than replace it.
 
 ### Active energy
 
@@ -190,3 +192,6 @@ Risky progression:
 - Should very long sessions have diminishing returns?
 - How should sphere slot costs scale?
 - What is the first compelling non-streak glyph build?
+- Should Sphere Points alone buy permanent identity nodes, or should stronger nodes also require Energy?
+- How steep should the Glyph Forge cost curve be?
+- Should the first glyph arrive from a milestone choice, a Core Power unlock, or a Forge purchase?

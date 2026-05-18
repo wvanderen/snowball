@@ -109,8 +109,9 @@ Features:
 - optional offline cap
 - active production significantly stronger than passive
 - session completion burst
-- basic sphere leveling
-- spend energy on simple sphere upgrades
+- per-sphere XP and level curve
+- Sphere Points from sphere levels
+- spend Energy on simple power upgrades
 
 Open decisions:
 
@@ -118,6 +119,7 @@ Open decisions:
 - offline cap duration
 - diminishing returns for long sessions
 - whether daily targets affect production scaling
+- when late-game Sphere XP multipliers should appear
 
 ## Phase 5: Sphere slots and lattice growth
 
@@ -144,6 +146,7 @@ Features:
 
 - toggle connections active/inactive
 - set connection direction
+- set per-edge Energy allocation for outgoing routes
 - energy flow visualization per edge
 - simple connected-sphere buffs
 - center as output node
@@ -163,9 +166,11 @@ Goal: introduce build variety and make different consistency styles viable.
 Features:
 
 - glyph inventory
-- glyph slots on spheres
+- glyph slots on spheres as power-scaling upgrades
 - equip/unequip glyphs
 - first set of basic glyphs
+- Glyph Forge or milestone-choice acquisition
+- escalating Energy cost for glyph rolls/rewards
 - glyph effects based on existing stats
 
 Initial glyph candidates:
@@ -223,8 +228,10 @@ Goal: deepen long-term engagement after the core loop is strong.
 
 Possible systems:
 
+- Core Power upgrade tree at the Center
 - ritual gems
 - sphere specializations
+- advanced glyph rarity and fusion
 - global center upgrades
 - milestone chains
 - weekly quests/challenges

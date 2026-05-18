@@ -28,6 +28,7 @@ import {
   outgoingConnectionsForSphere,
   reverseConnection,
   routeConnectionToSphere,
+  routeExistingConnectionToSphere,
   routedSphereRates,
   setActiveRitual,
   setConnectionAllocation,
@@ -376,7 +377,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
               const routedTo = state.spheres.find(
                 (item) => item.id === connection.toSphereId,
               )?.name;
-              return `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"} at ${connection.allocationPercent}%. Active route boost scales by allocation, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Enabled outgoing routes normalize to 100%.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><label>Share<input type="number" min="0" max="100" step="5" value="${connection.allocationPercent}" data-action="set-connection-allocation" data-connection-id="${connection.id}" /></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`;
+              return `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"} at ${connection.allocationPercent}%. Active route boost scales by allocation, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Enabled outgoing routes normalize to 100%.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}" data-connection-id="${connection.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><label>Share<input type="number" min="0" max="100" step="5" value="${connection.allocationPercent}" data-action="set-connection-allocation" data-connection-id="${connection.id}" /></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`;
             })
             .join("")
         : latticePanel === "glyphs"
@@ -558,7 +559,9 @@ app.addEventListener("change", async (event) => {
   }
   if (input instanceof HTMLSelectElement && input.dataset.action === "route-connection") {
     const sphereId = input.dataset.sphereId;
-    if (sphereId) routeConnectionToSphere(state, sphereId, input.value);
+    const connectionId = input.dataset.connectionId;
+    if (connectionId) routeExistingConnectionToSphere(state, connectionId, input.value);
+    else if (sphereId) routeConnectionToSphere(state, sphereId, input.value);
     persistState();
     render();
     return;

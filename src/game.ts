@@ -711,6 +711,29 @@ export const setConnectionAllocation = (
   return true;
 };
 
+export const routeExistingConnectionToSphere = (
+  state: AppState,
+  connectionId: string,
+  targetSphereId: string,
+) => {
+  const connection = state.connections.find((item) => item.id === connectionId);
+  if (!connection || connection.fromSphereId === targetSphereId) return false;
+  const sphere = state.spheres.find(
+    (item) => item.id === connection.fromSphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  const target = state.spheres.find((item) => item.id === targetSphereId && !item.archivedAt);
+  if (!sphere || !target) return false;
+
+  connection.toSphereId = targetSphereId;
+  connection.active = true;
+  connection.enabled = true;
+  connection.mode = "manual";
+  connection.routingLoss = targetSphereId === centerSphereId ? 0 : 0.05;
+  connection.updatedAt = nowIso();
+  normalizeOutgoingAllocations(state, connection.fromSphereId);
+  return true;
+};
+
 export const routeConnectionToSphere = (
   state: AppState,
   sphereId: string,
@@ -745,15 +768,7 @@ export const routeConnectionToSphere = (
     return true;
   }
 
-  connection.fromSphereId = sphereId;
-  connection.toSphereId = targetSphereId;
-  connection.active = true;
-  connection.enabled = true;
-  connection.mode = "manual";
-  connection.routingLoss = targetSphereId === centerSphereId ? 0 : 0.05;
-  connection.updatedAt = now;
-  normalizeOutgoingAllocations(state, sphereId);
-  return true;
+  return routeExistingConnectionToSphere(state, connection.id, targetSphereId);
 };
 
 export const archiveDomainSphere = (state: AppState, sphereId: string) => {

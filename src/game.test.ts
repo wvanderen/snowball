@@ -23,6 +23,7 @@ import {
   resolveProgressionModifiers,
   routedSphereRates,
   routeConnectionToSphere,
+  routeExistingConnectionToSphere,
   setActiveRitual,
   setConnectionAllocation,
   sphereSlotCost,
@@ -286,6 +287,31 @@ describe("core game calculations", () => {
 
     expect(outgoingConnectionsForSphere(state, first.id)[0]!.toSphereId).toBe(second.id);
     expect(outgoingConnectionsForSphere(state, second.id)[0]!.toSphereId).toBe(third.id);
+  });
+
+  it("retargets the requested outgoing route instead of the first route", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 1000;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    state.game.energy = 1000;
+    const third = createDomainSphere(state, "Study", "#38bdf8", 25)!;
+    state.game.energy = 1000;
+    const fourth = createDomainSphere(state, "Writing", "#f97316", 15)!;
+    routeConnectionToSphere(state, first.id, second.id);
+    const firstRoute = outgoingConnectionsForSphere(state, first.id)[0]!;
+    state.connections.push({
+      ...firstRoute,
+      id: "connection_second_route",
+      toSphereId: third.id,
+      allocationPercent: 50,
+    });
+    const secondRoute = outgoingConnectionsForSphere(state, first.id)[1]!;
+
+    expect(routeExistingConnectionToSphere(state, secondRoute.id, fourth.id)).toBe(true);
+
+    expect(outgoingConnectionsForSphere(state, first.id)[0]!.toSphereId).toBe(second.id);
+    expect(outgoingConnectionsForSphere(state, first.id)[1]!.toSphereId).toBe(fourth.id);
   });
 
   it("normalizes both old and new sources when reversing route allocations", () => {

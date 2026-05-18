@@ -16,6 +16,9 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
+  claimForgedGlyph,
+  forgeGlyphChoices,
+  glyphForgeCost,
   purchaseCorePower,
   recentSessionsForRitual,
   outgoingConnectionsForSphere,
@@ -102,6 +105,36 @@ describe("core game calculations", () => {
     expect(state.game.lastPassiveTickAt).toBe("2026-05-08T12:01:00.000Z");
 
     vi.useRealTimers();
+  });
+
+  it("forges one of three deterministic glyph rewards with escalating energy costs", () => {
+    const state = createInitialState();
+
+    expect(glyphForgeCost(0)).toBe(75);
+    expect(forgeGlyphChoices(state)).toBeNull();
+
+    state.game.energy = 1_000;
+    const forge = forgeGlyphChoices(state, () => 0.01)!;
+
+    expect(forge.cost).toBe(75);
+    expect(forge.choices).toHaveLength(3);
+    expect(new Set(forge.choices.map((choice) => choice.definitionId)).size).toBe(3);
+    expect(state.game.energy).toBe(925);
+    expect(state.game.glyphForgeCount).toBe(1);
+    expect(forge.nextCost).toBe(glyphForgeCost(1));
+
+    const beforeGlyphCount = state.glyphs.length;
+    const glyph = claimForgedGlyph(state, forge.choices[0]!);
+
+    expect(state.glyphs).toHaveLength(beforeGlyphCount + 1);
+    expect(glyph).toMatchObject({
+      definitionId: forge.choices[0]!.definitionId,
+      name: forge.choices[0]!.name,
+      effect: forge.choices[0]!.effect,
+      equippedSphereId: null,
+    });
+    expect(glyph.id).not.toBe(forge.choices[0]!.definitionId);
+    expect(glyphForgeCost(1)).toBeGreaterThan(forge.cost);
   });
 
   it("purchases persistent Core Power at the Center with escalating Energy costs", () => {

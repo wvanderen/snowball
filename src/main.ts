@@ -22,6 +22,10 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
+  claimForgedGlyph,
+  forgeGlyphChoices,
+  glyphForgeCost,
+  type GlyphForgeChoice,
   formatDuration,
   formatMinutes,
   getRitual,
@@ -78,6 +82,7 @@ let editingSphereId: string | null = null;
 let creatingRitualForSphereId: string | null = null;
 let editingRitualId: string | null = null;
 let isSettingsOpen = false;
+let pendingForgeChoices: GlyphForgeChoice[] = [];
 
 const backupInputId = "backup-import-input";
 const round = (value: number) => Math.floor(value).toLocaleString();
@@ -348,6 +353,11 @@ const renderSphereTraces = (sphere: Sphere) => {
   }</section>`;
 };
 
+const renderGlyphForgePanel = () => {
+  const cost = glyphForgeCost(state.game.glyphForgeCount);
+  return `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Glyph Forge · ${round(cost)} Energy</span><p>Spend Energy to reveal three choices. Pick one to add to inventory; each forge sharply increases the next cost.</p><small>Forged ${state.game.glyphForgeCount} times · next cost previews after selection</small></div><button class="upgrade-action" data-action="forge-glyphs" ${state.game.energy >= cost && pendingForgeChoices.length === 0 ? "" : "disabled"}>Forge · ${round(cost)}</button>${pendingForgeChoices.length > 0 ? `<div class="equipped-glyphs">${pendingForgeChoices.map((choice, index) => `<button class="glyph-chip" title="${choice.description}" data-action="claim-forged-glyph" data-choice-index="${index}">${choice.name} · ${choice.rarity}</button>`).join("")}</div>` : ""}</section>`;
+};
+
 const renderSphereGameLayer = (sphere: Sphere) => {
   const coreProgress = corePowerProgress(state);
   const canAffordCorePower = state.game.energy >= coreProgress.cost;
@@ -384,7 +394,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
             })
             .join("")
         : latticePanel === "glyphs"
-          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots are per-node investments. Spend Sphere Points to unlock slots at levels 1, 4, and 7.</p></div><div class="glyph-slots">${sphere.glyphSlots.map((slot) => `<span class="glyph-slot ${slot.unlocked ? "is-unlocked" : "is-locked"}">${slot.unlocked ? (slot.glyphId ? "Filled" : "Open") : `Locked L${1 + slot.index * 3}`}</span>`).join("")}</div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<button class="quiet" data-action="unlock-glyph-slot" data-sphere-id="${sphere.id}" ${nextGlyphSlot && sphere.level >= nextGlyphSlot.level && sphere.availablePoints >= nextGlyphSlot.pointCost ? "" : "disabled"}>${nextGlyphSlot ? `Unlock slot ${nextGlyphSlot.index + 1} · ${nextGlyphSlot.pointCost} pt` : "All slots unlocked"}</button><label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
+          ? `${renderGlyphForgePanel()}<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots are per-node investments. Spend Sphere Points to unlock slots at levels 1, 4, and 7.</p></div><div class="glyph-slots">${sphere.glyphSlots.map((slot) => `<span class="glyph-slot ${slot.unlocked ? "is-unlocked" : "is-locked"}">${slot.unlocked ? (slot.glyphId ? "Filled" : "Open") : `Locked L${1 + slot.index * 3}`}</span>`).join("")}</div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<button class="quiet" data-action="unlock-glyph-slot" data-sphere-id="${sphere.id}" ${nextGlyphSlot && sphere.level >= nextGlyphSlot.level && sphere.availablePoints >= nextGlyphSlot.pointCost ? "" : "disabled"}>${nextGlyphSlot ? `Unlock slot ${nextGlyphSlot.index + 1} · ${nextGlyphSlot.pointCost} pt` : "All slots unlocked"}</button><label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
           : renderProgressionPanel(sphere);
   return `<div class="sphere-layer sphere-game-layer">
     <section class="lattice-summary" aria-label="Game effect for ${sphere.name}">
@@ -738,6 +748,26 @@ app.addEventListener("click", async (event) => {
   if (action === "unlock-glyph-slot") {
     const sphereId = actionElement.dataset.sphereId;
     if (sphereId && unlockGlyphSlot(state, sphereId)) lastReward = "Mod slot unlocked";
+    persistState();
+    render();
+  }
+  if (action === "forge-glyphs") {
+    const forge = forgeGlyphChoices(state);
+    if (forge) {
+      pendingForgeChoices = forge.choices;
+      lastReward = `Forge opened · next ${round(forge.nextCost)}`;
+    }
+    persistState();
+    render();
+  }
+  if (action === "claim-forged-glyph") {
+    const choiceIndex = Number(actionElement.dataset.choiceIndex);
+    const choice = pendingForgeChoices[choiceIndex];
+    if (choice) {
+      const glyph = claimForgedGlyph(state, choice);
+      pendingForgeChoices = [];
+      lastReward = `${glyph.name} added`;
+    }
     persistState();
     render();
   }

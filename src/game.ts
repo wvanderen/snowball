@@ -1,7 +1,9 @@
 import {
   type AppState,
   type Connection,
+  type Glyph,
   type GlyphEffect,
+  type GlyphRarity,
   type ModifierEffect,
   type Ritual,
   type SpherePath,
@@ -129,6 +131,131 @@ export const levelForXp = (xp: number) => {
 };
 
 export const corePowerCost = (level = 1) => Math.floor(120 * level ** 1.65);
+export const glyphForgeCost = (forgeCount = 0) => Math.floor(75 * 1.85 ** forgeCount);
+
+export type GlyphDefinition = {
+  definitionId: string;
+  name: string;
+  effect: GlyphEffect;
+  description: string;
+  rarity: GlyphRarity;
+};
+
+export type GlyphForgeChoice = GlyphDefinition & { choiceId: string };
+
+export type GlyphRandomSource = () => number;
+
+export const glyphDefinitions: GlyphDefinition[] = [
+  [
+    "glyph_streak",
+    "Streak Lens",
+    "streak",
+    "Active energy scales with this sphere's streak.",
+    "common",
+  ],
+  [
+    "glyph_recent_consistency",
+    "Consistency Prism",
+    "recent-consistency",
+    "Milestone completion today improves passive production.",
+    "common",
+  ],
+  [
+    "glyph_deep_work",
+    "Deep Work Rune",
+    "deep-work",
+    "Long sessions earn extra active energy.",
+    "common",
+  ],
+  [
+    "glyph_recovery",
+    "Recovery Knot",
+    "recovery",
+    "Missed days decay momentum more gently.",
+    "common",
+  ],
+  [
+    "glyph_persistence",
+    "Persistence Mark",
+    "persistence",
+    "Every logged session adds extra momentum.",
+    "common",
+  ],
+  [
+    "glyph_resonance",
+    "Resonance Sigil",
+    "resonance",
+    "Outgoing routes carry a stronger active-session buff.",
+    "common",
+  ],
+  ["glyph_amplify", "Amplify", "amplify", "Sphere output +10%.", "uncommon"],
+  ["glyph_store", "Store", "store", "Store 5% of outgoing Energy as Charge.", "uncommon"],
+  ["glyph_release", "Release", "release", "Session end releases 25% of Charge.", "uncommon"],
+  ["glyph_bloom", "Bloom", "bloom", "Milestone Bloom +20%.", "rare"],
+  ["glyph_echo", "Echo", "echo", "Bloom Energy ripples into connected spheres.", "rare"],
+  ["glyph_kindle", "Kindle", "kindle", "First return after inactivity gives +8 Momentum.", "rare"],
+].map(([definitionId, name, effect, description, rarity]) => ({
+  definitionId,
+  name,
+  effect: effect as GlyphEffect,
+  description,
+  rarity: rarity as GlyphRarity,
+}));
+
+const deterministicGlyphIndex = (seed: number) => {
+  const x = Math.sin(seed * 999 + 17) * 10000;
+  return Math.floor((x - Math.floor(x)) * glyphDefinitions.length);
+};
+
+export const generateGlyphForgeChoices = (
+  forgeCount: number,
+  randomSource?: GlyphRandomSource,
+): GlyphForgeChoice[] => {
+  const selected: GlyphDefinition[] = [];
+  let cursor = Math.max(0, forgeCount);
+  while (selected.length < 3) {
+    const randomIndex = randomSource
+      ? Math.floor(Math.max(0, Math.min(0.999999, randomSource())) * glyphDefinitions.length)
+      : deterministicGlyphIndex(cursor + selected.length * 13);
+    const index = (randomIndex + cursor) % glyphDefinitions.length;
+    const candidate = glyphDefinitions[index]!;
+    if (!selected.some((choice) => choice.definitionId === candidate.definitionId)) {
+      selected.push(candidate);
+    }
+    cursor += 1;
+  }
+  return selected.map((choice, index) => ({
+    ...choice,
+    choiceId: `${forgeCount}:${index}:${choice.definitionId}`,
+  }));
+};
+
+export const forgeGlyphChoices = (state: AppState, randomSource?: GlyphRandomSource) => {
+  const cost = glyphForgeCost(state.game.glyphForgeCount);
+  if (state.game.energy < cost) return null;
+  state.game.energy -= cost;
+  const choices = generateGlyphForgeChoices(state.game.glyphForgeCount, randomSource);
+  state.game.glyphForgeCount += 1;
+  return { cost, choices, nextCost: glyphForgeCost(state.game.glyphForgeCount) };
+};
+
+export const claimForgedGlyph = (state: AppState, choice: GlyphForgeChoice) => {
+  const now = nowIso();
+  const glyph: Glyph = {
+    id: createId("glyph"),
+    definitionId: choice.definitionId,
+    name: choice.name,
+    effect: choice.effect,
+    description: choice.description,
+    rarity: choice.rarity,
+    level: 1,
+    equippedSphereId: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+  state.glyphs.push(glyph);
+  return glyph;
+};
 
 export const sphereLevelCost = (sphere: Sphere) =>
   sphere.kind === "center" ? corePowerCost(sphere.level) : Number.POSITIVE_INFINITY;

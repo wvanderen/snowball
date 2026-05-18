@@ -16,6 +16,7 @@ import {
   finishActiveSession,
   recentSessionsForRitual,
   reverseConnection,
+  resolveProgressionModifiers,
   routedSphereRates,
   routeConnectionToSphere,
   setActiveRitual,
@@ -336,6 +337,28 @@ describe("core game calculations", () => {
     );
     expect(source.equippedGlyphIds).toEqual(["glyph_streak"]);
     expect(target.equippedGlyphIds).toEqual(["glyph_deep_work"]);
+  });
+
+  it("resolves stacked progression modifiers for sphere and routing calculations", () => {
+    const state = createInitialState();
+    const sphere = createDomainSphere(state, "Study", "#38bdf8", 20)!;
+    sphere.xp = 100;
+
+    expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
+    expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
+    expect(spendSpherePoint(state, sphere.id, "Bloom")).toBe(true);
+    expect(equipGlyph(state, "glyph_amplify", sphere.id)).toBe(true);
+    sphere.glyphSlotCount = 2;
+    expect(equipGlyph(state, "glyph_store", sphere.id)).toBe(true);
+
+    const resolution = resolveProgressionModifiers(state, { sphereId: sphere.id });
+
+    expect(resolution.effects).toHaveLength(5);
+    expect(resolution.totals.outputMultiplierBonus).toBeCloseTo(0.15);
+    expect(resolution.totals.routingLossReduction).toBeCloseTo(0.05);
+    expect(resolution.totals.milestoneBloomMultiplierBonus).toBeCloseTo(0.1);
+    expect(resolution.totals.chargeStoreShare).toBeCloseTo(0.05);
+    expect(routedSphereRates(state, sphere).activePerMinute).toBeCloseTo(37.26);
   });
 
   it("levels domain spheres from XP and grants sphere-specific path points", () => {

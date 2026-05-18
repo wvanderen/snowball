@@ -131,8 +131,78 @@ export const levelForXp = (xp: number) => {
 export const sphereLevelCost = (sphere: Sphere) =>
   sphere.kind === "center" ? Math.floor(120 * sphere.level ** 1.65) : Number.POSITIVE_INFINITY;
 
-const sumEffects = (effects: ModifierEffect[], type: ModifierEffect["type"]) =>
-  effects.reduce((total, effect) => total + (effect.type === type ? effect.value : 0), 0);
+export type ProgressionModifierContext = {
+  sphereId?: string;
+  connectionId?: string;
+  sessionId?: string;
+};
+
+export type ProgressionModifierTotals = {
+  outputMultiplierBonus: number;
+  routingLossReduction: number;
+  activeEdgeThroughputBonus: number;
+  chargeStoreShare: number;
+  maxChargeMultiplierBonus: number;
+  milestoneChargeReleaseShare: number;
+  sessionEndChargeReleaseShare: number;
+  milestoneBloomMultiplierBonus: number;
+  bloomNeighborEnergyShare: number;
+  firstSessionMiniBloomShare: number;
+  momentumDecayReduction: number;
+  momentumFloorIncrease: number;
+  returnAfterInactivityMomentumBonus: number;
+};
+
+export type ProgressionModifierResolution = {
+  context: ProgressionModifierContext;
+  effects: ModifierEffect[];
+  totals: ProgressionModifierTotals;
+};
+
+const emptyModifierTotals = (): ProgressionModifierTotals => ({
+  outputMultiplierBonus: 0,
+  routingLossReduction: 0,
+  activeEdgeThroughputBonus: 0,
+  chargeStoreShare: 0,
+  maxChargeMultiplierBonus: 0,
+  milestoneChargeReleaseShare: 0,
+  sessionEndChargeReleaseShare: 0,
+  milestoneBloomMultiplierBonus: 0,
+  bloomNeighborEnergyShare: 0,
+  firstSessionMiniBloomShare: 0,
+  momentumDecayReduction: 0,
+  momentumFloorIncrease: 0,
+  returnAfterInactivityMomentumBonus: 0,
+});
+
+const aggregateModifierEffects = (effects: ModifierEffect[]): ProgressionModifierTotals => {
+  const totals = emptyModifierTotals();
+  for (const effect of effects) {
+    if (effect.type === "MULTIPLY_OUTGOING_ENERGY") totals.outputMultiplierBonus += effect.value;
+    else if (effect.type === "REDUCE_ROUTING_LOSS") totals.routingLossReduction += effect.value;
+    else if (effect.type === "ACTIVE_EDGE_THROUGHPUT_BONUS")
+      totals.activeEdgeThroughputBonus += effect.value;
+    else if (effect.type === "STORE_INCOMING_ENERGY_AS_CHARGE")
+      totals.chargeStoreShare += effect.value;
+    else if (effect.type === "MULTIPLY_MAX_CHARGE") totals.maxChargeMultiplierBonus += effect.value;
+    else if (effect.type === "RELEASE_CHARGE_ON_MILESTONE")
+      totals.milestoneChargeReleaseShare += effect.value;
+    else if (effect.type === "RELEASE_CHARGE_ON_SESSION_END")
+      totals.sessionEndChargeReleaseShare += effect.value;
+    else if (effect.type === "MULTIPLY_MILESTONE_BLOOM")
+      totals.milestoneBloomMultiplierBonus += effect.value;
+    else if (effect.type === "BLOOM_NEIGHBOR_ENERGY_SHARE")
+      totals.bloomNeighborEnergyShare += effect.value;
+    else if (effect.type === "FIRST_SESSION_MINI_BLOOM")
+      totals.firstSessionMiniBloomShare += effect.value;
+    else if (effect.type === "REDUCE_MOMENTUM_DECAY") totals.momentumDecayReduction += effect.value;
+    else if (effect.type === "INCREASE_MOMENTUM_FLOOR")
+      totals.momentumFloorIncrease += effect.value;
+    else if (effect.type === "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS")
+      totals.returnAfterInactivityMomentumBonus += effect.value;
+  }
+  return totals;
+};
 
 export const pathRank = (sphere: Sphere, path: SpherePath) =>
   sphere.pathAllocations.find((allocation) => allocation.path === path)?.rank ?? 0;
@@ -160,8 +230,20 @@ export const effectsForSphere = (state: AppState, sphere: Sphere): ModifierEffec
   return [...pathEffects, ...glyphEffects];
 };
 
+export const resolveProgressionModifiers = (
+  state: AppState,
+  context: ProgressionModifierContext,
+): ProgressionModifierResolution => {
+  const sphere = context.sphereId
+    ? state.spheres.find((item) => item.id === context.sphereId)
+    : null;
+  const effects = sphere ? effectsForSphere(state, sphere) : [];
+  return { context, effects, totals: aggregateModifierEffects(effects) };
+};
+
 export const maxChargeForSphere = (state: AppState, sphere: Sphere) =>
-  baseMaxCharge * (1 + sumEffects(effectsForSphere(state, sphere), "MULTIPLY_MAX_CHARGE"));
+  baseMaxCharge *
+  (1 + resolveProgressionModifiers(state, { sphereId: sphere.id }).totals.maxChargeMultiplierBonus);
 
 const recalculateSphereProgression = (sphere: Sphere) => {
   if (sphere.kind !== "domain") return;
@@ -326,10 +408,12 @@ export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string)
   );
   if (!hasActiveRoute) return 1;
   const activeSphere = state.spheres.find((sphere) => sphere.id === activeSphereId);
-  const effects = activeSphere ? effectsForSphere(state, activeSphere) : [];
-  const conduitBonus = sumEffects(effects, "ACTIVE_EDGE_THROUGHPUT_BONUS");
+  const modifiers = activeSphere
+    ? resolveProgressionModifiers(state, { sphereId: activeSphere.id })
+    : null;
+  const conduitBonus = modifiers?.totals.activeEdgeThroughputBonus ?? 0;
   const baseLoss = sphereId === centerSphereId ? 0 : 0.05;
-  const reducedLoss = Math.max(0, baseLoss - sumEffects(effects, "REDUCE_ROUTING_LOSS"));
+  const reducedLoss = Math.max(0, baseLoss - (modifiers?.totals.routingLossReduction ?? 0));
   return (
     (hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25) + conduitBonus - reducedLoss
   );
@@ -350,11 +434,11 @@ export const glyphRateMultiplier = (state: AppState, sphere: Sphere) => {
 };
 
 export const routedSphereRates = (state: AppState, sphere: Sphere) => {
-  const effects = effectsForSphere(state, sphere);
+  const modifiers = resolveProgressionModifiers(state, { sphereId: sphere.id });
   return sphereRates(
     sphere,
     connectedSphereBuffMultiplier(state, sphere.id) * glyphRateMultiplier(state, sphere),
-    1 + sumEffects(effects, "MULTIPLY_OUTGOING_ENERGY"),
+    1 + modifiers.totals.outputMultiplierBonus,
   );
 };
 
@@ -389,8 +473,8 @@ const missedMomentumDecay = (state: AppState, sphere: Sphere, today: string) => 
   const glyphAdjusted = hasGlyphEffect(state, sphere.id, "recovery")
     ? Math.floor(baseDecay * 0.7)
     : baseDecay;
-  const anchorAdjusted =
-    glyphAdjusted * (1 - sumEffects(effectsForSphere(state, sphere), "REDUCE_MOMENTUM_DECAY"));
+  const modifiers = resolveProgressionModifiers(state, { sphereId: sphere.id });
+  const anchorAdjusted = glyphAdjusted * (1 - modifiers.totals.momentumDecayReduction);
   return Math.floor(anchorAdjusted / centerRecoveryMultiplier(state));
 };
 
@@ -411,7 +495,9 @@ export const ensureToday = (state: AppState) => {
       const decay = missedMomentumDecay(state, sphere, today);
       sphere.todaySeconds = 0;
       sphere.dailyProgressDate = today;
-      const floor = sumEffects(effectsForSphere(state, sphere), "INCREASE_MOMENTUM_FLOOR");
+      const floor = resolveProgressionModifiers(state, {
+        sphereId: sphere.id,
+      }).totals.momentumFloorIncrease;
       sphere.momentum = clamp(sphere.momentum - decay, floor, 100);
       sphere.updatedAt = nowIso();
     }
@@ -840,11 +926,12 @@ export const finishActiveSession = (state: AppState) => {
   const milestoneMomentumBoost = completedMilestoneAfterSession ? momentumModel.milestoneBoost : 0;
   const momentumBefore = sphere.momentum;
   const glyphMomentumBoost = hasGlyphEffect(state, sphere.id, "persistence") ? 1 : 0;
-  const effects = effectsForSphere(state, sphere);
-  const returnBoost = inactiveReturn
-    ? sumEffects(effects, "RETURN_AFTER_INACTIVITY_MOMENTUM_BONUS")
-    : 0;
-  const momentumFloor = sumEffects(effects, "INCREASE_MOMENTUM_FLOOR");
+  const modifiers = resolveProgressionModifiers(state, {
+    sphereId: sphere.id,
+    sessionId: active.id,
+  });
+  const returnBoost = inactiveReturn ? modifiers.totals.returnAfterInactivityMomentumBonus : 0;
+  const momentumFloor = modifiers.totals.momentumFloorIncrease;
   sphere.momentum = clamp(
     sphere.momentum +
       momentumSessionBoost +
@@ -860,22 +947,22 @@ export const finishActiveSession = (state: AppState) => {
     hasGlyphEffect(state, sphere.id, "deep-work") && minutes >= 25 ? 1.2 : 1;
   const activeEnergy = minutes * activePerMinute * deepWorkMultiplier;
   const baseMilestoneEnergy = sphere.dailyTargetMinutes * 2;
-  const bloomMultiplier = 1 + sumEffects(effects, "MULTIPLY_MILESTONE_BLOOM");
+  const bloomMultiplier = 1 + modifiers.totals.milestoneBloomMultiplierBonus;
   const fullBloomEnergy = baseMilestoneEnergy * bloomMultiplier;
   const miniBloomEnergy =
     !hadAnyProgressToday && !completedMilestoneAfterSession
-      ? fullBloomEnergy * sumEffects(effects, "FIRST_SESSION_MINI_BLOOM")
+      ? fullBloomEnergy * modifiers.totals.firstSessionMiniBloomShare
       : 0;
   const milestoneEnergy = completedMilestoneAfterSession ? fullBloomEnergy : miniBloomEnergy;
   const milestoneChargeRelease =
-    completedMilestoneAfterSession && sumEffects(effects, "RELEASE_CHARGE_ON_MILESTONE") > 0
-      ? sphere.charge
+    completedMilestoneAfterSession && modifiers.totals.milestoneChargeReleaseShare > 0
+      ? sphere.charge * Math.min(1, modifiers.totals.milestoneChargeReleaseShare)
       : 0;
   if (milestoneChargeRelease > 0) sphere.charge = 0;
   const sessionChargeRelease =
     milestoneChargeRelease > 0
       ? 0
-      : sphere.charge * Math.min(1, sumEffects(effects, "RELEASE_CHARGE_ON_SESSION_END"));
+      : sphere.charge * Math.min(1, modifiers.totals.sessionEndChargeReleaseShare);
   if (sessionChargeRelease > 0) sphere.charge -= sessionChargeRelease;
   const bloomNeighborEnergy = completedMilestoneAfterSession
     ? state.connections
@@ -892,10 +979,7 @@ export const finishActiveSession = (state: AppState) => {
             (item) => item.id === neighborId && item.kind === "domain" && !item.archivedAt,
           );
         })
-        .reduce(
-          (total) => total + milestoneEnergy * sumEffects(effects, "BLOOM_NEIGHBOR_ENERGY_SHARE"),
-          0,
-        )
+        .reduce((total) => total + milestoneEnergy * modifiers.totals.bloomNeighborEnergyShare, 0)
     : 0;
   const energyGained =
     activeEnergy +
@@ -904,8 +988,7 @@ export const finishActiveSession = (state: AppState) => {
     sessionChargeRelease +
     bloomNeighborEnergy;
 
-  const chargeStored =
-    (activeEnergy + milestoneEnergy) * sumEffects(effects, "STORE_INCOMING_ENERGY_AS_CHARGE");
+  const chargeStored = (activeEnergy + milestoneEnergy) * modifiers.totals.chargeStoreShare;
   sphere.charge = Math.min(maxChargeForSphere(state, sphere), sphere.charge + chargeStored);
 
   state.game.energy += energyGained;

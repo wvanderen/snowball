@@ -401,17 +401,44 @@ export const sphereRates = (sphere: Sphere, buffMultiplier = 1, outputMultiplier
   return { passivePerHour, activePerMinute };
 };
 
+export const outgoingConnectionsForSphere = (state: AppState, sphereId: string) =>
+  state.connections.filter((connection) => connection.fromSphereId === sphereId);
+
+export const enabledOutgoingConnectionsForSphere = (state: AppState, sphereId: string) =>
+  outgoingConnectionsForSphere(state, sphereId).filter(
+    (connection) => connection.enabled && connection.active,
+  );
+
+export const normalizeOutgoingAllocations = (state: AppState, sphereId: string) => {
+  const enabled = enabledOutgoingConnectionsForSphere(state, sphereId);
+  if (enabled.length === 0) return false;
+
+  const positive = enabled.filter((connection) => connection.allocationPercent > 0);
+  const source = positive.length > 0 ? positive : enabled;
+  const total = source.reduce(
+    (sum, connection) => sum + Math.max(0, connection.allocationPercent),
+    0,
+  );
+  const equalShare = 100 / enabled.length;
+  let assigned = 0;
+
+  enabled.forEach((connection, index) => {
+    const raw = total > 0 ? (Math.max(0, connection.allocationPercent) / total) * 100 : equalShare;
+    const allocation = index === enabled.length - 1 ? 100 - assigned : Math.round(raw);
+    connection.allocationPercent = clamp(allocation, 0, 100);
+    assigned += connection.allocationPercent;
+  });
+  return true;
+};
+
 export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string) => {
   const activeSphereId = state.activeSession?.sphereId;
   if (!activeSphereId || activeSphereId === sphereId) return 1;
 
-  const hasActiveRoute = state.connections.some(
-    (connection) =>
-      connection.active &&
-      connection.fromSphereId === activeSphereId &&
-      connection.toSphereId === sphereId,
+  const activeRoutes = enabledOutgoingConnectionsForSphere(state, activeSphereId).filter(
+    (connection) => connection.toSphereId === sphereId,
   );
-  if (!hasActiveRoute) return 1;
+  if (activeRoutes.length === 0) return 1;
   const activeSphere = state.spheres.find((sphere) => sphere.id === activeSphereId);
   const modifiers = activeSphere
     ? resolveProgressionModifiers(state, { sphereId: activeSphere.id })
@@ -419,9 +446,13 @@ export const connectedSphereBuffMultiplier = (state: AppState, sphereId: string)
   const conduitBonus = modifiers?.totals.activeEdgeThroughputBonus ?? 0;
   const baseLoss = sphereId === centerSphereId ? 0 : 0.05;
   const reducedLoss = Math.max(0, baseLoss - (modifiers?.totals.routingLossReduction ?? 0));
-  return (
-    (hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25) + conduitBonus - reducedLoss
+  const fullRouteMultiplier =
+    (hasGlyphEffect(state, activeSphereId, "resonance") ? 1.35 : 1.25) + conduitBonus - reducedLoss;
+  const allocatedShare = Math.min(
+    1,
+    activeRoutes.reduce((sum, connection) => sum + connection.allocationPercent, 0) / 100,
   );
+  return 1 + (fullRouteMultiplier - 1) * allocatedShare;
 };
 
 export const glyphRateMultiplier = (state: AppState, sphere: Sphere) => {
@@ -638,6 +669,7 @@ export const toggleConnection = (state: AppState, connectionId: string) => {
   connection.enabled = connection.active;
   connection.mode = connection.active ? "manual" : "disabled";
   connection.updatedAt = nowIso();
+  normalizeOutgoingAllocations(state, connection.fromSphereId);
   return true;
 };
 
@@ -656,6 +688,21 @@ export const reverseConnection = (state: AppState, connectionId: string) => {
     connection.fromSphereId,
   ];
   connection.updatedAt = nowIso();
+  normalizeOutgoingAllocations(state, connection.fromSphereId);
+  return true;
+};
+
+export const setConnectionAllocation = (
+  state: AppState,
+  connectionId: string,
+  allocationPercent: number,
+) => {
+  const connection = state.connections.find((item) => item.id === connectionId);
+  if (!connection || !Number.isFinite(allocationPercent)) return false;
+
+  connection.allocationPercent = clamp(Math.round(allocationPercent), 0, 100);
+  connection.updatedAt = nowIso();
+  normalizeOutgoingAllocations(state, connection.fromSphereId);
   return true;
 };
 
@@ -689,6 +736,7 @@ export const routeConnectionToSphere = (
       updatedAt: now,
     };
     state.connections.push(connection);
+    normalizeOutgoingAllocations(state, sphereId);
     return true;
   }
 
@@ -697,7 +745,9 @@ export const routeConnectionToSphere = (
   connection.active = true;
   connection.enabled = true;
   connection.mode = "manual";
+  connection.routingLoss = targetSphereId === centerSphereId ? 0 : 0.05;
   connection.updatedAt = now;
+  normalizeOutgoingAllocations(state, sphereId);
   return true;
 };
 

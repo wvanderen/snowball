@@ -23,6 +23,7 @@ import {
   routedSphereRates,
   routeConnectionToSphere,
   setActiveRitual,
+  setConnectionAllocation,
   sphereSlotCost,
   spendSpherePoint,
   startSession,
@@ -269,6 +270,32 @@ describe("core game calculations", () => {
     expect(reverseConnection(state, connection.id)).toBe(true);
     expect(connection.fromSphereId).toBe(second.id);
     expect(connection.toSphereId).toBe(first.id);
+  });
+
+  it("normalizes enabled route allocations and scales active route buffs", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 1000;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    state.game.energy = 1000;
+    const third = createDomainSphere(state, "Study", "#38bdf8", 25)!;
+    routeConnectionToSphere(state, first.id, second.id);
+    const firstRoute = connectionForSphere(state, first.id)!;
+    state.connections.push({
+      ...firstRoute,
+      id: "connection_extra",
+      toSphereId: third.id,
+      allocationPercent: 50,
+    });
+
+    expect(setConnectionAllocation(state, firstRoute.id, 25)).toBe(true);
+    expect(firstRoute.allocationPercent + state.connections.at(-1)!.allocationPercent).toBe(100);
+
+    startSession(state, first.id);
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBeCloseTo(1.066);
+    expect(toggleConnection(state, state.connections.at(-1)!.id)).toBe(true);
+    expect(firstRoute.allocationPercent).toBe(100);
+    expect(connectedSphereBuffMultiplier(state, second.id)).toBeCloseTo(1.2);
   });
 
   it("buffs nodes connected to the active sphere", () => {

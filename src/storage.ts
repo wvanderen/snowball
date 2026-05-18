@@ -125,6 +125,7 @@ export const createInitialState = (): AppState => {
       corePowerLevel: 1,
       coreUpgrades: [],
       glyphForgeCount: 0,
+      firstGlyphRewardClaimed: false,
       lastPassiveTickAt: now,
     },
     activeSession: null,
@@ -249,6 +250,7 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
     corePowerLevel: Math.max(1, Number(restored.game.corePowerLevel ?? 1)),
     coreUpgrades: Array.isArray(restored.game.coreUpgrades) ? restored.game.coreUpgrades : [],
     glyphForgeCount: Math.max(0, Number(restored.game.glyphForgeCount ?? 0)),
+    firstGlyphRewardClaimed: Boolean(restored.game.firstGlyphRewardClaimed ?? false),
   } as GameState;
   restored.connections = (Array.isArray(candidate.connections) ? restored.connections : []).map(
     (connection) => ({

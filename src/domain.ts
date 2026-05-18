@@ -172,6 +172,7 @@ export type GameState = {
   corePowerLevel: number;
   coreUpgrades: CoreUpgradePurchase[];
   glyphForgeCount: number;
+  firstGlyphRewardClaimed: boolean;
   lastPassiveTickAt: string;
 };
 

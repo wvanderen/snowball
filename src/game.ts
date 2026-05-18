@@ -230,6 +230,18 @@ export const generateGlyphForgeChoices = (
   }));
 };
 
+export const generateFirstGlyphRewardChoices = (): GlyphForgeChoice[] =>
+  glyphDefinitions.slice(0, 3).map((choice, index) => ({
+    ...choice,
+    choiceId: `first:${index}:${choice.definitionId}`,
+  }));
+
+export const canClaimFirstGlyphReward = (state: AppState) =>
+  !state.game.firstGlyphRewardClaimed &&
+  state.spheres.some(
+    (sphere) => sphere.kind === "domain" && sphere.glyphSlots.some((slot) => slot.unlocked),
+  );
+
 export const forgeGlyphChoices = (state: AppState, randomSource?: GlyphRandomSource) => {
   const cost = glyphForgeCost(state.game.glyphForgeCount);
   if (state.game.energy < cost) return null;
@@ -239,21 +251,36 @@ export const forgeGlyphChoices = (state: AppState, randomSource?: GlyphRandomSou
   return { cost, choices, nextCost: glyphForgeCost(state.game.glyphForgeCount) };
 };
 
+const createGlyphFromChoice = (choice: GlyphForgeChoice, now: string): Glyph => ({
+  id: createId("glyph"),
+  definitionId: choice.definitionId,
+  name: choice.name,
+  effect: choice.effect,
+  description: choice.description,
+  rarity: choice.rarity,
+  level: 1,
+  equippedSphereId: null,
+  createdAt: now,
+  updatedAt: now,
+});
+
 export const claimForgedGlyph = (state: AppState, choice: GlyphForgeChoice) => {
   const now = nowIso();
-  const glyph: Glyph = {
-    id: createId("glyph"),
-    definitionId: choice.definitionId,
-    name: choice.name,
-    effect: choice.effect,
-    description: choice.description,
-    rarity: choice.rarity,
-    level: 1,
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  };
+  const glyph: Glyph = createGlyphFromChoice(choice, now);
   state.glyphs.push(glyph);
+  return glyph;
+};
+
+export const claimFirstGlyphReward = (state: AppState, choice: GlyphForgeChoice) => {
+  if (!canClaimFirstGlyphReward(state)) return null;
+  const glyph = claimForgedGlyph(state, choice);
+  state.game.firstGlyphRewardClaimed = true;
+  const firstEligibleSphere = state.spheres.find(
+    (sphere) =>
+      sphere.kind === "domain" &&
+      sphere.glyphSlots.some((slot) => slot.unlocked && slot.glyphId === null),
+  );
+  if (firstEligibleSphere) equipGlyph(state, glyph.id, firstEligibleSphere.id);
   return glyph;
 };
 

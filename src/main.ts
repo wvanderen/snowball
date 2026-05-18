@@ -22,8 +22,11 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
+  canClaimFirstGlyphReward,
+  claimFirstGlyphReward,
   claimForgedGlyph,
   forgeGlyphChoices,
+  generateFirstGlyphRewardChoices,
   glyphForgeCost,
   type GlyphForgeChoice,
   formatDuration,
@@ -355,7 +358,8 @@ const renderSphereTraces = (sphere: Sphere) => {
 
 const renderGlyphForgePanel = () => {
   const cost = glyphForgeCost(state.game.glyphForgeCount);
-  return `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Glyph Forge · ${round(cost)} Energy</span><p>Spend Energy to reveal three choices. Pick one to add to inventory; each forge sharply increases the next cost.</p><small>Forged ${state.game.glyphForgeCount} times · next cost previews after selection</small></div><button class="upgrade-action" data-action="forge-glyphs" ${state.game.energy >= cost && pendingForgeChoices.length === 0 ? "" : "disabled"}>Forge · ${round(cost)}</button>${pendingForgeChoices.length > 0 ? `<div class="equipped-glyphs">${pendingForgeChoices.map((choice, index) => `<button class="glyph-chip" title="${choice.description}" data-action="claim-forged-glyph" data-choice-index="${index}">${choice.name} · ${choice.rarity}</button>`).join("")}</div>` : ""}</section>`;
+  const firstChoices = canClaimFirstGlyphReward(state) ? generateFirstGlyphRewardChoices() : [];
+  return `${firstChoices.length > 0 ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>First Mod Choice</span><p>Your first open slot awakens a guaranteed Mod. Pick one; it will socket into the first eligible sphere automatically.</p><small>No Energy cost · choose 1 of 3</small></div><div class="equipped-glyphs">${firstChoices.map((choice, index) => `<button class="glyph-chip" title="${choice.description}" data-action="claim-first-glyph" data-choice-index="${index}">${choice.name} · ${choice.rarity}</button>`).join("")}</div></section>` : ""}<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Glyph Forge · ${round(cost)} Energy</span><p>Spend Energy to reveal three choices. Pick one to add to inventory; each forge sharply increases the next cost.</p><small>Forged ${state.game.glyphForgeCount} times · next cost previews after selection</small></div><button class="upgrade-action" data-action="forge-glyphs" ${state.game.energy >= cost && pendingForgeChoices.length === 0 ? "" : "disabled"}>Forge · ${round(cost)}</button>${pendingForgeChoices.length > 0 ? `<div class="equipped-glyphs">${pendingForgeChoices.map((choice, index) => `<button class="glyph-chip" title="${choice.description}" data-action="claim-forged-glyph" data-choice-index="${index}">${choice.name} · ${choice.rarity}</button>`).join("")}</div>` : ""}</section>`;
 };
 
 const renderSphereGameLayer = (sphere: Sphere) => {
@@ -756,6 +760,16 @@ app.addEventListener("click", async (event) => {
     if (forge) {
       pendingForgeChoices = forge.choices;
       lastReward = `Forge opened · next ${round(forge.nextCost)}`;
+    }
+    persistState();
+    render();
+  }
+  if (action === "claim-first-glyph") {
+    const choiceIndex = Number(actionElement.dataset.choiceIndex);
+    const choice = generateFirstGlyphRewardChoices()[choiceIndex];
+    if (choice) {
+      const glyph = claimFirstGlyphReward(state, choice);
+      if (glyph) lastReward = `${glyph.name} socketed`;
     }
     persistState();
     render();

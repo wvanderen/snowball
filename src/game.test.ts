@@ -16,8 +16,11 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
+  canClaimFirstGlyphReward,
+  claimFirstGlyphReward,
   claimForgedGlyph,
   forgeGlyphChoices,
+  generateFirstGlyphRewardChoices,
   glyphForgeCost,
   purchaseCorePower,
   recentSessionsForRitual,
@@ -135,6 +138,28 @@ describe("core game calculations", () => {
     });
     expect(glyph.id).not.toBe(forge.choices[0]!.definitionId);
     expect(glyphForgeCost(1)).toBeGreaterThan(forge.cost);
+  });
+
+  it("offers one guaranteed first glyph choice after the first slot unlocks", () => {
+    const state = createInitialState();
+    createDomainSphere(state, "Study", "#38bdf8", 10);
+    const sphere = state.spheres.find((item) => item.kind === "domain")!;
+
+    expect(canClaimFirstGlyphReward(state)).toBe(false);
+    sphere.xp = 15;
+    expect(unlockGlyphSlot(state, sphere.id)).toBe(true);
+    expect(canClaimFirstGlyphReward(state)).toBe(true);
+
+    const choices = generateFirstGlyphRewardChoices();
+    expect(choices).toHaveLength(3);
+    const glyph = claimFirstGlyphReward(state, choices[1]!)!;
+
+    expect(state.game.firstGlyphRewardClaimed).toBe(true);
+    expect(glyph.definitionId).toBe(choices[1]!.definitionId);
+    expect(glyph.equippedSphereId).toBe(sphere.id);
+    expect(sphere.equippedGlyphIds).toEqual([glyph.id]);
+    expect(sphere.glyphSlots[0]!.glyphId).toBe(glyph.id);
+    expect(claimFirstGlyphReward(state, choices[0]!)).toBeNull();
   });
 
   it("purchases persistent Core Power at the Center with escalating Energy costs", () => {

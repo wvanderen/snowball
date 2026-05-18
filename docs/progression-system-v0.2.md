@@ -461,15 +461,15 @@ growthRate = 1.35
 
 Example cost curve:
 
-| Forge # |    Cost |
-| ------: | ------: |
-|       1 |     100 |
-|       2 |     135 |
-|       3 |     182 |
-|       4 |     246 |
-|       5 |     332 |
-|      10 |   2,107 |
-|      20 | 42,000+ |
+| Forge # |   Cost |
+| ------: | -----: |
+|       1 |    100 |
+|       2 |    135 |
+|       3 |    182 |
+|       4 |    246 |
+|       5 |    332 |
+|      10 |  1,490 |
+|      20 | 30,272 |
 
 Numbers should be tuned against the Energy economy. The important shape is steep scaling.
 

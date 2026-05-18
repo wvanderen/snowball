@@ -302,7 +302,6 @@ const renderEconomyDock = (spheres: Sphere[]) => {
   return `
     <aside class="economy-dock" aria-label="Snowball economy">
       <div><span>Energy</span><strong>${round(state.game.energy + projectedActiveEnergy())}</strong></div>
-      <div><span>XP</span><strong>${round(state.game.experience)}</strong></div>
       <div><span>Gain</span><strong>+${currentGain}</strong></div>
       <div><span>Idle</span><strong>${round(passiveRate)}/h</strong></div>
       <div class="active-chip ${active ? "" : "is-idle"}"><span>Active</span><strong>${active?.name ?? "None"}</strong></div>
@@ -445,7 +444,7 @@ const renderModalLayers = () =>
 
 const renderSettingsPanel = () =>
   isSettingsOpen
-    ? `<div class="modal-scrim settings-scrim"><section class="settings-panel" role="dialog" aria-labelledby="settings-title"><div class="settings-heading"><p class="kicker">Local</p><h1 id="settings-title">Settings</h1><button class="quiet" type="button" data-action="close-settings">Close</button></div><div class="settings-group"><h2>Data</h2><p>Stored in this browser.</p><div class="settings-actions"><button class="quiet" data-action="export-backup">Export</button><button class="quiet" data-action="import-backup">Import</button></div></div><div class="settings-group danger-zone"><h2>Reset</h2><p>Clears nodes, actions, sessions, energy, XP.</p><button class="quiet danger" data-action="reset">Reset</button></div></section></div>`
+    ? `<div class="modal-scrim settings-scrim"><section class="settings-panel" role="dialog" aria-labelledby="settings-title"><div class="settings-heading"><p class="kicker">Local</p><h1 id="settings-title">Settings</h1><button class="quiet" type="button" data-action="close-settings">Close</button></div><div class="settings-group"><h2>Data</h2><p>Stored in this browser.</p><div class="settings-actions"><button class="quiet" data-action="export-backup">Export</button><button class="quiet" data-action="import-backup">Import</button></div></div><div class="settings-group danger-zone"><h2>Reset</h2><p>Clears nodes, actions, sessions, energy, and sphere progress.</p><button class="quiet danger" data-action="reset">Reset</button></div></section></div>`
     : "";
 
 const renderEditSphereModal = () => {

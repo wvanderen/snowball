@@ -170,7 +170,9 @@ const recalculateSphereProgression = (sphere: Sphere) => {
     (total, allocation) => total + allocation.rank,
     0,
   );
-  sphere.availablePoints = Math.max(0, sphere.level - 1 - sphere.spentPoints);
+  sphere.spherePointsEarned = Math.max(0, sphere.level - 1);
+  sphere.spherePointsSpent = sphere.spentPoints;
+  sphere.availablePoints = Math.max(0, sphere.spherePointsEarned - sphere.spherePointsSpent);
 };
 
 export const spendSpherePoint = (state: AppState, sphereId: string, path: SpherePath) => {
@@ -243,10 +245,21 @@ export const equipGlyph = (state: AppState, glyphId: string, sphereId: string) =
     previousSphere.equippedGlyphIds = previousSphere.equippedGlyphIds.filter(
       (id) => id !== glyph.id,
     );
+    previousSphere.glyphSlots.forEach((slot) => {
+      if (slot.glyphId === glyph.id) {
+        slot.glyphId = null;
+        slot.updatedAt = now;
+      }
+    });
     previousSphere.updatedAt = now;
   }
 
   if (!isAlreadyEquippedHere) sphere.equippedGlyphIds.push(glyph.id);
+  const openSlot = sphere.glyphSlots.find((slot) => slot.unlocked && slot.glyphId === null);
+  if (openSlot && !isAlreadyEquippedHere) {
+    openSlot.glyphId = glyph.id;
+    openSlot.updatedAt = now;
+  }
   glyph.equippedSphereId = sphere.id;
   glyph.updatedAt = now;
   sphere.updatedAt = now;
@@ -259,8 +272,15 @@ export const unequipGlyph = (state: AppState, glyphId: string) => {
 
   const sphere = state.spheres.find((item) => item.id === glyph.equippedSphereId);
   if (sphere) {
+    const now = nowIso();
     sphere.equippedGlyphIds = sphere.equippedGlyphIds.filter((id) => id !== glyph.id);
-    sphere.updatedAt = nowIso();
+    sphere.glyphSlots.forEach((slot) => {
+      if (slot.glyphId === glyph.id) {
+        slot.glyphId = null;
+        slot.updatedAt = now;
+      }
+    });
+    sphere.updatedAt = now;
   }
   glyph.equippedSphereId = null;
   glyph.updatedAt = nowIso();
@@ -454,11 +474,26 @@ export const createDomainSphere = (
     ritualIds: [ritualId],
     glyphSlotCount: 1,
     equippedGlyphIds: [],
+    glyphSlots: [
+      {
+        id: `${sphereId}_glyph_slot_1`,
+        sphereId,
+        index: 0,
+        unlocked: true,
+        glyphId: null,
+        source: "base",
+        createdAt: now,
+        updatedAt: now,
+      },
+    ],
     level: 1,
     xp: 0,
+    spherePointsEarned: 0,
+    spherePointsSpent: 0,
     availablePoints: 0,
     spentPoints: 0,
     pathAllocations: [],
+    upgradePurchases: [],
     charge: 0,
     firstRespecUsed: false,
     lastSessionAt: null,
@@ -481,6 +516,12 @@ export const createDomainSphere = (
     fromSphereId: sphereId,
     toSphereId: centerSphereId,
     active: true,
+    enabled: true,
+    allocationPercent: 100,
+    level: 1,
+    throughputMultiplier: 1,
+    routingLoss: 0,
+    mode: "manual",
     createdAt: now,
     updatedAt: now,
   };
@@ -503,6 +544,8 @@ export const toggleConnection = (state: AppState, connectionId: string) => {
   if (!connection) return false;
 
   connection.active = !connection.active;
+  connection.enabled = connection.active;
+  connection.mode = connection.active ? "manual" : "disabled";
   connection.updatedAt = nowIso();
   return true;
 };
@@ -545,6 +588,12 @@ export const routeConnectionToSphere = (
       fromSphereId: sphereId,
       toSphereId: targetSphereId,
       active: true,
+      enabled: true,
+      allocationPercent: 100,
+      level: 1,
+      throughputMultiplier: 1,
+      routingLoss: targetSphereId === centerSphereId ? 0 : 0.05,
+      mode: "manual",
       createdAt: now,
       updatedAt: now,
     };
@@ -555,6 +604,8 @@ export const routeConnectionToSphere = (
   connection.fromSphereId = sphereId;
   connection.toSphereId = targetSphereId;
   connection.active = true;
+  connection.enabled = true;
+  connection.mode = "manual";
   connection.updatedAt = now;
   return true;
 };
@@ -571,6 +622,8 @@ export const archiveDomainSphere = (state: AppState, sphereId: string) => {
   for (const connection of state.connections) {
     if (connection.fromSphereId === sphereId || connection.toSphereId === sphereId) {
       connection.active = false;
+      connection.enabled = false;
+      connection.mode = "disabled";
       connection.updatedAt = now;
     }
   }
@@ -730,7 +783,7 @@ export const finishActiveSession = (state: AppState) => {
 
   if (sphere.kind === "center") {
     const minutes = durationSeconds / secondsPerMinute;
-    const xpGained = minutes * 0.5;
+    const xpGained = 0;
     const energyGained = minutes * centerRecoveryMultiplier(state);
     const recoveryBoost = Math.min(4, Math.max(1, Math.floor(minutes / 5) + 1));
     for (const domainSphere of domainSpheres(state)) {
@@ -739,8 +792,6 @@ export const finishActiveSession = (state: AppState) => {
     }
     state.game.energy += energyGained;
     state.game.lifetimeEnergy += energyGained;
-    state.game.experience += xpGained;
-    state.game.lifetimeExperience += xpGained;
 
     const session: Session = {
       id: active.id,
@@ -859,8 +910,6 @@ export const finishActiveSession = (state: AppState) => {
 
   state.game.energy += energyGained;
   state.game.lifetimeEnergy += energyGained;
-  state.game.experience += xpGained;
-  state.game.lifetimeExperience += xpGained;
 
   const session: Session = {
     id: active.id,

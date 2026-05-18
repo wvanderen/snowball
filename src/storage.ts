@@ -87,11 +87,15 @@ export const createInitialState = (): AppState => {
         ritualIds: centerRituals.map((ritual) => ritual.id),
         glyphSlotCount: 0,
         equippedGlyphIds: [],
+        glyphSlots: [],
         level: 1,
         xp: 0,
+        spherePointsEarned: 0,
+        spherePointsSpent: 0,
         availablePoints: 0,
         spentPoints: 0,
         pathAllocations: [],
+        upgradePurchases: [],
         charge: 0,
         firstRespecUsed: false,
         lastSessionAt: null,
@@ -118,6 +122,9 @@ export const createInitialState = (): AppState => {
       lifetimeEnergy: 0,
       experience: 0,
       lifetimeExperience: 0,
+      corePowerLevel: 1,
+      coreUpgrades: [],
+      glyphForgeCount: 0,
       lastPassiveTickAt: now,
     },
     activeSession: null,
@@ -157,116 +164,47 @@ const createCenterRecoveryRituals = (now: string): Ritual[] => [
   },
 ];
 
-const createStarterGlyphs = (now: string): Glyph[] => [
-  {
-    id: "glyph_streak",
-    name: "Streak Lens",
-    effect: "streak",
-    description: "Active energy scales with this sphere's streak.",
+const createStarterGlyphs = (now: string): Glyph[] =>
+  [
+    ["glyph_streak", "Streak Lens", "streak", "Active energy scales with this sphere's streak."],
+    [
+      "glyph_recent_consistency",
+      "Consistency Prism",
+      "recent-consistency",
+      "Milestone completion today improves passive production.",
+    ],
+    ["glyph_deep_work", "Deep Work Rune", "deep-work", "Long sessions earn extra active energy."],
+    ["glyph_recovery", "Recovery Knot", "recovery", "Missed days decay momentum more gently."],
+    [
+      "glyph_persistence",
+      "Persistence Mark",
+      "persistence",
+      "Every logged session adds extra momentum.",
+    ],
+    [
+      "glyph_resonance",
+      "Resonance Sigil",
+      "resonance",
+      "Outgoing routes carry a stronger active-session buff.",
+    ],
+    ["glyph_amplify", "Amplify", "amplify", "Sphere output +10%."],
+    ["glyph_store", "Store", "store", "Store 5% of outgoing Energy as Charge."],
+    ["glyph_release", "Release", "release", "Session end releases 25% of Charge."],
+    ["glyph_bloom", "Bloom", "bloom", "Milestone Bloom +20%."],
+    ["glyph_echo", "Echo", "echo", "Bloom Energy ripples into connected spheres."],
+    ["glyph_kindle", "Kindle", "kindle", "First return after inactivity gives +8 Momentum."],
+  ].map(([id, name, effect, description]) => ({
+    id,
+    definitionId: id,
+    name,
+    effect: effect as Glyph["effect"],
+    description,
+    rarity: "common",
+    level: 1,
     equippedSphereId: null,
     createdAt: now,
     updatedAt: now,
-  },
-  {
-    id: "glyph_recent_consistency",
-    name: "Consistency Prism",
-    effect: "recent-consistency",
-    description: "Milestone completion today improves passive production.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_deep_work",
-    name: "Deep Work Rune",
-    effect: "deep-work",
-    description: "Long sessions earn extra active energy.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_recovery",
-    name: "Recovery Knot",
-    effect: "recovery",
-    description: "Missed days decay momentum more gently.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_persistence",
-    name: "Persistence Mark",
-    effect: "persistence",
-    description: "Every logged session adds extra momentum.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_resonance",
-    name: "Resonance Sigil",
-    effect: "resonance",
-    description: "Outgoing routes carry a stronger active-session buff.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_amplify",
-    name: "Amplify",
-    effect: "amplify",
-    description: "Sphere output +10%.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_store",
-    name: "Store",
-    effect: "store",
-    description: "Store 5% of outgoing Energy as Charge.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_release",
-    name: "Release",
-    effect: "release",
-    description: "Session end releases 25% of Charge.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_bloom",
-    name: "Bloom",
-    effect: "bloom",
-    description: "Milestone Bloom +20%.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_echo",
-    name: "Echo",
-    effect: "echo",
-    description: "Bloom Energy ripples into connected spheres.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: "glyph_kindle",
-    name: "Kindle",
-    effect: "kindle",
-    description: "First return after inactivity gives +8 Momentum.",
-    equippedSphereId: null,
-    createdAt: now,
-    updatedAt: now,
-  },
-];
+  }));
 
 const mergeStarterGlyphs = (glyphs: Glyph[], now: string) => {
   const existingIds = new Set(glyphs.map((glyph) => glyph.id));
@@ -276,6 +214,18 @@ const mergeStarterGlyphs = (glyphs: Glyph[], now: string) => {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
+
+const defaultGlyphSlots = (sphere: Sphere, now: string) =>
+  Array.from({ length: sphere.glyphSlotCount }, (_, index) => ({
+    id: `${sphere.id}_glyph_slot_${index + 1}`,
+    sphereId: sphere.id,
+    index,
+    unlocked: true,
+    glyphId: sphere.equippedGlyphIds[index] ?? null,
+    source: index === 0 ? "base" : "sphere-upgrade",
+    createdAt: sphere.createdAt ?? now,
+    updatedAt: sphere.updatedAt ?? now,
+  })) satisfies Sphere["glyphSlots"];
 
 const migrateState = (candidate: Record<string, unknown>): AppState => {
   if (candidate.version !== supportedStateVersion) {
@@ -292,11 +242,35 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
   if (!isRecord(candidate.game)) throw new Error("Backup is missing game data.");
 
   const restored = { ...createInitialState(), ...candidate } as AppState;
-  restored.connections = Array.isArray(candidate.connections) ? restored.connections : [];
+  const now = nowIso();
+  restored.game = {
+    ...createInitialState().game,
+    ...(isRecord(candidate.game) ? candidate.game : {}),
+    corePowerLevel: Math.max(1, Number(restored.game.corePowerLevel ?? 1)),
+    coreUpgrades: Array.isArray(restored.game.coreUpgrades) ? restored.game.coreUpgrades : [],
+    glyphForgeCount: Math.max(0, Number(restored.game.glyphForgeCount ?? 0)),
+  } as GameState;
+  restored.connections = (Array.isArray(candidate.connections) ? restored.connections : []).map(
+    (connection) => ({
+      ...connection,
+      active: connection.active ?? connection.enabled ?? true,
+      enabled: connection.enabled ?? connection.active ?? true,
+      allocationPercent: connection.allocationPercent ?? 100,
+      level: connection.level ?? 1,
+      throughputMultiplier: connection.throughputMultiplier ?? 1,
+      routingLoss: connection.routingLoss ?? (connection.toSphereId === centerSphereId ? 0 : 0.05),
+      mode: connection.mode ?? "manual",
+    }),
+  );
   restored.glyphs = mergeStarterGlyphs(
     Array.isArray(candidate.glyphs) ? restored.glyphs : [],
-    nowIso(),
-  );
+    now,
+  ).map((glyph) => ({
+    ...glyph,
+    definitionId: glyph.definitionId ?? glyph.id,
+    rarity: glyph.rarity ?? "common",
+    level: glyph.level ?? 1,
+  }));
   restored.activeSession = isRecord(candidate.activeSession) ? restored.activeSession : null;
   restored.spheres = restored.spheres.map((sphere) => {
     const legacySphere = sphere as Sphere & { lastSessionDate?: string | null };
@@ -308,17 +282,31 @@ const migrateState = (candidate: Record<string, unknown>): AppState => {
       ...sphere,
       level,
       xp,
+      spherePointsEarned:
+        sphere.spherePointsEarned ?? (sphere.kind === "domain" ? Math.max(0, level - 1) : 0),
+      spherePointsSpent: sphere.spherePointsSpent ?? (sphere.kind === "domain" ? spentPoints : 0),
       availablePoints:
         sphere.kind === "domain"
           ? Math.max(0, level - 1 - spentPoints)
           : (sphere.availablePoints ?? 0),
       spentPoints: sphere.kind === "domain" ? spentPoints : (sphere.spentPoints ?? 0),
       pathAllocations,
+      upgradePurchases: sphere.upgradePurchases ?? [],
       charge: sphere.charge ?? 0,
       firstRespecUsed: sphere.firstRespecUsed ?? false,
       lastSessionAt: sphere.lastSessionAt ?? legacySphere.lastSessionDate ?? null,
       glyphSlotCount: sphere.glyphSlotCount ?? (sphere.kind === "domain" ? 1 : 0),
       equippedGlyphIds: sphere.equippedGlyphIds ?? [],
+      glyphSlots:
+        sphere.glyphSlots ??
+        defaultGlyphSlots(
+          {
+            ...sphere,
+            glyphSlotCount: sphere.glyphSlotCount ?? (sphere.kind === "domain" ? 1 : 0),
+            equippedGlyphIds: sphere.equippedGlyphIds ?? [],
+          },
+          now,
+        ),
       archivedAt: sphere.archivedAt ?? null,
     };
   });

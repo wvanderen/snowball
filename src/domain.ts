@@ -40,12 +40,30 @@ export type GlyphEffect =
   | "echo"
   | "kindle";
 
-export type Glyph = {
+export type GlyphRarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+
+export type GlyphInstance = {
   id: string;
+  definitionId: string;
   name: string;
   effect: GlyphEffect;
   description: string;
+  rarity: GlyphRarity;
+  level: number;
   equippedSphereId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type Glyph = GlyphInstance;
+
+export type GlyphSlot = {
+  id: string;
+  sphereId: string;
+  index: number;
+  unlocked: boolean;
+  glyphId: string | null;
+  source: "base" | "sphere-upgrade" | "core-upgrade" | "special";
   createdAt: string;
   updatedAt: string;
 };
@@ -54,6 +72,23 @@ export type PathAllocation = {
   path: SpherePath;
   rank: number;
 };
+
+export type SphereUpgradePurchase = {
+  id: string;
+  sphereId: string;
+  upgradeId: string;
+  rank: number;
+  purchasedAt: string;
+};
+
+export type CoreUpgradePurchase = {
+  id: string;
+  upgradeId: string;
+  rank: number;
+  purchasedAt: string;
+};
+
+export type ConnectionMode = "manual" | "balanced" | "priority" | "disabled";
 
 export type Sphere = {
   id: string;
@@ -65,11 +100,15 @@ export type Sphere = {
   ritualIds: string[];
   glyphSlotCount: number;
   equippedGlyphIds: string[];
+  glyphSlots: GlyphSlot[];
   level: number;
   xp: number;
+  spherePointsEarned: number;
+  spherePointsSpent: number;
   availablePoints: number;
   spentPoints: number;
   pathAllocations: PathAllocation[];
+  upgradePurchases: SphereUpgradePurchase[];
   charge: number;
   firstRespecUsed: boolean;
   lastSessionAt: string | null;
@@ -115,6 +154,12 @@ export type Connection = {
   fromSphereId: string;
   toSphereId: string;
   active: boolean;
+  enabled: boolean;
+  allocationPercent: number;
+  level: number;
+  throughputMultiplier: number;
+  routingLoss: number;
+  mode: ConnectionMode;
   createdAt: string;
   updatedAt: string;
 };
@@ -124,6 +169,9 @@ export type GameState = {
   lifetimeEnergy: number;
   experience: number;
   lifetimeExperience: number;
+  corePowerLevel: number;
+  coreUpgrades: CoreUpgradePurchase[];
+  glyphForgeCount: number;
   lastPassiveTickAt: string;
 };
 

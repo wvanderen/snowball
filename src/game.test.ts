@@ -118,7 +118,7 @@ describe("core game calculations", () => {
     expect(result!.session.sphereId).toBe(center.id);
     expect(result!.session.completedMilestoneAfterSession).toBe(false);
     expect(result!.energyGained).toBeCloseTo(10);
-    expect(result!.xpGained).toBeCloseTo(5);
+    expect(result!.xpGained).toBe(0);
     expect(center.currentStreak).toBe(0);
     expect(center.milestoneCompletedDate).toBeNull();
     expect(domain.momentum).toBe(23);
@@ -155,8 +155,9 @@ describe("core game calculations", () => {
     expect(sphere!.milestoneCompletedDate).toBe(localDateKey());
     expect(sphere!.currentStreak).toBe(1);
     expect(sphere!.bestStreak).toBe(1);
-    expect(state.game.experience).toBe(10);
-    expect(state.game.lifetimeExperience).toBe(10);
+    expect(sphere!.xp).toBe(10);
+    expect(state.game.experience).toBe(0);
+    expect(state.game.lifetimeExperience).toBe(0);
     expect(state.game.energy).toBeCloseTo(113);
     expect(state.game.lifetimeEnergy).toBeCloseTo(113);
     expect(state.sessions).toHaveLength(1);
@@ -342,6 +343,8 @@ describe("core game calculations", () => {
     setNow("2026-05-08T12:00:00.000Z");
     const state = createInitialState();
     const sphere = createDomainSphere(state, "Study", "#38bdf8", 20)!;
+    state.game.energy = 100;
+    const otherSphere = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
 
     state.activeSession = {
       id: "session_level",
@@ -356,6 +359,11 @@ describe("core game calculations", () => {
     expect(sphere.xp).toBe(15);
     expect(sphere.level).toBe(2);
     expect(sphere.availablePoints).toBe(1);
+    expect(otherSphere.xp).toBe(0);
+    expect(otherSphere.level).toBe(1);
+    expect(otherSphere.availablePoints).toBe(0);
+    expect(state.game.experience).toBe(0);
+    expect(state.game.lifetimeExperience).toBe(0);
     expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
     expect(sphere.availablePoints).toBe(0);
     expect(sphere.pathAllocations).toEqual([{ path: "Flow", rank: 1 }]);
@@ -647,6 +655,54 @@ describe("core game calculations", () => {
         "glyph_kindle",
       ]),
     );
+  });
+
+  it("defaults progression v0.2 fields when importing old saved states", () => {
+    const state = createInitialState();
+    const sphere = createDomainSphere(state, "Legacy", "#38bdf8", 20)!;
+    sphere.xp = 45;
+    sphere.pathAllocations = [{ path: "Flow", rank: 1 }];
+    const connection = connectionForSphere(state, sphere.id)!;
+    const backup = JSON.parse(createBackupJson(state)) as { state: Record<string, any> };
+
+    delete backup.state.game.corePowerLevel;
+    delete backup.state.game.coreUpgrades;
+    delete backup.state.game.glyphForgeCount;
+    delete backup.state.spheres[1].spherePointsEarned;
+    delete backup.state.spheres[1].spherePointsSpent;
+    delete backup.state.spheres[1].upgradePurchases;
+    delete backup.state.spheres[1].glyphSlots;
+    delete backup.state.connections[0].enabled;
+    delete backup.state.connections[0].allocationPercent;
+    delete backup.state.connections[0].level;
+    delete backup.state.connections[0].throughputMultiplier;
+    delete backup.state.connections[0].routingLoss;
+    delete backup.state.connections[0].mode;
+    delete backup.state.glyphs[0].definitionId;
+    delete backup.state.glyphs[0].rarity;
+    delete backup.state.glyphs[0].level;
+
+    const restored = parseBackupState(JSON.stringify(backup));
+    const restoredSphere = restored.spheres.find((item) => item.id === sphere.id)!;
+    const restoredConnection = restored.connections.find((item) => item.id === connection.id)!;
+
+    expect(restored.game.corePowerLevel).toBe(1);
+    expect(restored.game.coreUpgrades).toEqual([]);
+    expect(restored.game.glyphForgeCount).toBe(0);
+    expect(restoredSphere.spherePointsEarned).toBe(2);
+    expect(restoredSphere.spherePointsSpent).toBe(1);
+    expect(restoredSphere.availablePoints).toBe(1);
+    expect(restoredSphere.upgradePurchases).toEqual([]);
+    expect(restoredSphere.glyphSlots).toHaveLength(1);
+    expect(restoredConnection.enabled).toBe(true);
+    expect(restoredConnection.allocationPercent).toBe(100);
+    expect(restoredConnection.level).toBe(1);
+    expect(restoredConnection.mode).toBe("manual");
+    expect(restored.glyphs[0]).toMatchObject({
+      definitionId: restored.glyphs[0]!.id,
+      rarity: "common",
+      level: 1,
+    });
   });
 
   it("rejects invalid backup files", () => {

@@ -419,7 +419,7 @@ const renderProgressionPanel = (sphere: Sphere) => {
   const respecCost = sphere.firstRespecUsed ? 25 * sphere.spentPoints : 0;
   return `<section class="lattice-section progression-panel">
     <div class="lattice-section-copy"><span>Upgrade</span><p>Spend points. Reset later.</p></div>
-    <div class="progression-summary"><span>XP ${oneDecimal(sphere.xp)}${nextXp ? ` / ${nextXp}` : ""}</span><span>Pts ${sphere.availablePoints}</span><span>Charge ${oneDecimal(sphere.charge)} / ${oneDecimal(maxChargeForSphere(state, sphere))}</span></div>
+    <div class="progression-summary"><span>XP ${oneDecimal(sphere.xp)}${nextXp ? ` / ${nextXp}` : ""}</span><span>Pts ${sphere.availablePoints} avail · ${sphere.spherePointsEarned} earned · ${sphere.spherePointsSpent} spent</span><span>Charge ${oneDecimal(sphere.charge)} / ${oneDecimal(maxChargeForSphere(state, sphere))}</span></div>
     <div class="path-grid">${spherePaths
       .map((path) => {
         const rank = pathRank(sphere, path);

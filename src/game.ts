@@ -128,8 +128,15 @@ export const levelForXp = (xp: number) => {
   return level;
 };
 
+export const corePowerCost = (level = 1) => Math.floor(120 * level ** 1.65);
+
 export const sphereLevelCost = (sphere: Sphere) =>
-  sphere.kind === "center" ? Math.floor(120 * sphere.level ** 1.65) : Number.POSITIVE_INFINITY;
+  sphere.kind === "center" ? corePowerCost(sphere.level) : Number.POSITIVE_INFINITY;
+
+export const corePowerProgress = (state: AppState) => {
+  const cost = corePowerCost(state.game.corePowerLevel);
+  return { cost, percent: Math.min(100, (state.game.energy / cost) * 100) };
+};
 
 export type ProgressionModifierContext = {
   sphereId?: string;
@@ -291,10 +298,8 @@ export const respecSphere = (state: AppState, sphereId: string) => {
   return true;
 };
 
-export const centerRecoveryMultiplier = (state: AppState) => {
-  const center = state.spheres.find((sphere) => sphere.id === centerSphereId);
-  return 1 + Math.max(0, (center?.level ?? 1) - 1) * 0.05;
-};
+export const centerRecoveryMultiplier = (state: AppState) =>
+  1 + Math.max(0, state.game.corePowerLevel - 1) * 0.05;
 
 export const glyphSlotsForLevel = (level: number) =>
   Math.min(3, 1 + Math.floor(Math.max(0, level - 1) / 3));
@@ -716,19 +721,31 @@ export const archiveDomainSphere = (state: AppState, sphereId: string) => {
   return true;
 };
 
-export const purchaseSphereLevel = (state: AppState, sphereId: string) => {
-  const sphere = state.spheres.find((item) => item.id === sphereId && !item.archivedAt);
-  if (!sphere || sphere.kind !== "center") return false;
-
-  const cost = sphereLevelCost(sphere);
+export const purchaseCorePower = (state: AppState) => {
+  const cost = corePowerCost(state.game.corePowerLevel);
   if (state.game.energy < cost) return false;
 
+  const now = nowIso();
+  const nextLevel = state.game.corePowerLevel + 1;
   state.game.energy -= cost;
-  sphere.level += 1;
-  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
-  sphere.updatedAt = nowIso();
+  state.game.corePowerLevel = nextLevel;
+  state.game.coreUpgrades.push({
+    id: createId("core_upgrade"),
+    upgradeId: "core_power",
+    rank: nextLevel,
+    purchasedAt: now,
+  });
+
+  const center = state.spheres.find((item) => item.id === centerSphereId && !item.archivedAt);
+  if (center) {
+    center.level = nextLevel;
+    center.updatedAt = now;
+  }
   return true;
 };
+
+export const purchaseSphereLevel = (state: AppState, sphereId: string) =>
+  sphereId === centerSphereId ? purchaseCorePower(state) : false;
 
 export const updateDomainSphere = (
   state: AppState,

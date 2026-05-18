@@ -6,6 +6,8 @@ import {
   archiveDomainSphere,
   connectedSphereBuffMultiplier,
   connectionForSphere,
+  corePowerCost,
+  corePowerProgress,
   archiveRitual,
   createDomainSphere,
   createRitual,
@@ -14,6 +16,7 @@ import {
   equipGlyph,
   equippedGlyphsForSphere,
   finishActiveSession,
+  purchaseCorePower,
   recentSessionsForRitual,
   reverseConnection,
   resolveProgressionModifiers,
@@ -95,6 +98,24 @@ describe("core game calculations", () => {
     expect(state.game.lastPassiveTickAt).toBe("2026-05-08T12:01:00.000Z");
 
     vi.useRealTimers();
+  });
+
+  it("purchases persistent Core Power at the Center with escalating Energy costs", () => {
+    const state = createInitialState();
+    const center = state.spheres.find((item) => item.kind === "center")!;
+
+    expect(corePowerCost(1)).toBe(120);
+    expect(corePowerProgress(state)).toEqual({ cost: 120, percent: 0 });
+    expect(purchaseCorePower(state)).toBe(false);
+
+    state.game.energy = 120;
+    expect(purchaseCorePower(state)).toBe(true);
+    expect(state.game.energy).toBe(0);
+    expect(state.game.corePowerLevel).toBe(2);
+    expect(center.level).toBe(2);
+    expect(state.game.coreUpgrades).toHaveLength(1);
+    expect(state.game.coreUpgrades[0]).toMatchObject({ upgradeId: "core_power", rank: 2 });
+    expect(corePowerCost(state.game.corePowerLevel)).toBeGreaterThan(120);
   });
 
   it("logs optional Center recovery rituals with gentle rewards and domain momentum recovery", () => {

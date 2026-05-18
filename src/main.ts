@@ -13,6 +13,8 @@ import {
   archiveRitual,
   canUnlockSphereSlot,
   centerRecoveryMultiplier,
+  corePowerCost,
+  corePowerProgress,
   createDomainSphere,
   createRitual,
   domainSpheres,
@@ -28,10 +30,9 @@ import {
   routeConnectionToSphere,
   routedSphereRates,
   setActiveRitual,
-  sphereLevelCost,
   sphereSlotCost,
   pathRank,
-  purchaseSphereLevel,
+  purchaseCorePower,
   respecSphere,
   spendSpherePoint,
   spherePaths,
@@ -132,8 +133,8 @@ const levelProgressCopy = (sphere: Sphere) => {
     ? `Level ${sphere.level}, ${oneDecimal(Math.max(0, nextXp - sphere.xp))} XP to level ${sphere.level + 1}`
     : `Level ${sphere.level}, max shown track`;
 };
-const centerUpgradeCopy = (sphere: Sphere) =>
-  `Upgrade to level ${sphere.level + 1}: cost floor(120 × ${sphere.level}^1.65) = ${round(sphereLevelCost(sphere))}. Gives rest multiplier +0.05.`;
+const centerUpgradeCopy = () =>
+  `Core Power ${state.game.corePowerLevel + 1}: cost floor(120 × ${state.game.corePowerLevel}^1.65) = ${round(corePowerCost(state.game.corePowerLevel))}. Gives rest multiplier +0.05 and expands the global lattice spine.`;
 const selectedSphere = () => {
   const spheres = activeDomainSpheres();
   const candidate = state.spheres.find(
@@ -344,8 +345,8 @@ const renderSphereTraces = (sphere: Sphere) => {
 };
 
 const renderSphereGameLayer = (sphere: Sphere) => {
-  const levelCost = sphereLevelCost(sphere);
-  const canAffordLevel = state.game.energy >= levelCost;
+  const coreProgress = corePowerProgress(state);
+  const canAffordCorePower = state.game.energy >= coreProgress.cost;
   const rates =
     sphere.kind === "domain"
       ? routedSphereRates(state, sphere)
@@ -370,7 +371,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
       : "";
   const activePanel =
     sphere.kind === "center"
-      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Rest node · level ${sphere.level}</span><p>${centerUpgradeCopy(sphere)}</p></div><button class="upgrade-action" data-action="level-sphere" data-sphere-id="${sphere.id}" ${canAffordLevel ? "" : "disabled"}>Upgrade to Lv ${sphere.level + 1} · ${round(levelCost)}</button></section>`
+      ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Center · Core Power ${state.game.corePowerLevel}</span><p>${centerUpgradeCopy()}</p><small>${round(state.game.energy)} / ${round(coreProgress.cost)} Energy · ${Math.round(coreProgress.percent)}% ready</small></div><button class="upgrade-action" data-action="buy-core-power" ${canAffordCorePower ? "" : "disabled"}>Core Power ${state.game.corePowerLevel + 1} · ${round(coreProgress.cost)}</button></section>`
       : latticePanel === "route" && connection
         ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"}. Active route boosts target output 1.25×, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Flow can reduce that loss.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`
         : latticePanel === "glyphs"
@@ -382,7 +383,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
       <span><b>Idle</b> ${rates.passivePerHour.toFixed(1)}/h</span>
       <span><b>${sphere.kind === "domain" ? "Pts" : "Rest"}</b> ${sphere.kind === "domain" ? sphere.availablePoints : `×${centerRecoveryMultiplier(state).toFixed(2)}`}</span>
     </section>
-    ${sphere.kind === "domain" ? renderMechanicsBrief(sphere, rates.activePerMinute, rates.passivePerHour) : `<p class="mechanic-line">Rest multiplier = 1 + (center level - 1) × 0.05. Current: ×${centerRecoveryMultiplier(state).toFixed(2)}.</p>`}
+    ${sphere.kind === "domain" ? renderMechanicsBrief(sphere, rates.activePerMinute, rates.passivePerHour) : `<p class="mechanic-line">Rest multiplier = 1 + (Core Power - 1) × 0.05. Current: ×${centerRecoveryMultiplier(state).toFixed(2)}. Global XP is retired; Energy now funds Core Power.</p>`}
     ${panelNav}
     ${activePanel}
   </div>`;
@@ -716,9 +717,8 @@ app.addEventListener("click", async (event) => {
     persistState();
     render();
   }
-  if (action === "level-sphere") {
-    const sphereId = actionElement.dataset.sphereId;
-    if (sphereId && purchaseSphereLevel(state, sphereId)) lastReward = "Center upgraded";
+  if (action === "buy-core-power") {
+    if (purchaseCorePower(state)) lastReward = `Core Power ${state.game.corePowerLevel}`;
     persistState();
     render();
   }

@@ -252,13 +252,16 @@ export const maxChargeForSphere = (state: AppState, sphere: Sphere) =>
   baseMaxCharge *
   (1 + resolveProgressionModifiers(state, { sphereId: sphere.id }).totals.maxChargeMultiplierBonus);
 
+const glyphSlotInvestmentCount = (sphere: Sphere) =>
+  sphere.glyphSlots.filter((slot) => slot.unlocked && slot.source === "sphere-upgrade").length;
+
 const recalculateSphereProgression = (sphere: Sphere) => {
   if (sphere.kind !== "domain") return;
   sphere.level = levelForXp(sphere.xp);
-  sphere.spentPoints = sphere.pathAllocations.reduce(
-    (total, allocation) => total + allocation.rank,
-    0,
-  );
+  sphere.glyphSlotCount = sphere.glyphSlots.filter((slot) => slot.unlocked).length;
+  sphere.spentPoints =
+    sphere.pathAllocations.reduce((total, allocation) => total + allocation.rank, 0) +
+    glyphSlotInvestmentCount(sphere);
   sphere.spherePointsEarned = Math.max(0, sphere.level - 1);
   sphere.spherePointsSpent = sphere.spentPoints;
   sphere.availablePoints = Math.max(0, sphere.spherePointsEarned - sphere.spherePointsSpent);
@@ -301,8 +304,35 @@ export const respecSphere = (state: AppState, sphereId: string) => {
 export const centerRecoveryMultiplier = (state: AppState) =>
   1 + Math.max(0, state.game.corePowerLevel - 1) * 0.05;
 
-export const glyphSlotsForLevel = (level: number) =>
-  Math.min(3, 1 + Math.floor(Math.max(0, level - 1) / 3));
+export const nextGlyphSlotRequirement = (sphere: Sphere) => {
+  const nextIndex = sphere.glyphSlots.findIndex((slot) => !slot.unlocked);
+  if (sphere.kind !== "domain" || nextIndex < 0) return null;
+  return { index: nextIndex, level: 1 + nextIndex * 3, pointCost: 1 };
+};
+
+export const unlockGlyphSlot = (state: AppState, sphereId: string) => {
+  const sphere = state.spheres.find(
+    (item) => item.id === sphereId && item.kind === "domain" && !item.archivedAt,
+  );
+  if (!sphere) return false;
+  recalculateSphereProgression(sphere);
+  const requirement = nextGlyphSlotRequirement(sphere);
+  if (
+    !requirement ||
+    sphere.level < requirement.level ||
+    sphere.availablePoints < requirement.pointCost
+  ) {
+    return false;
+  }
+  const slot = sphere.glyphSlots[requirement.index];
+  if (!slot) return false;
+  slot.unlocked = true;
+  slot.source = "sphere-upgrade";
+  slot.updatedAt = nowIso();
+  recalculateSphereProgression(sphere);
+  sphere.updatedAt = nowIso();
+  return true;
+};
 
 export const equippedGlyphsForSphere = (state: AppState, sphereId: string) =>
   state.glyphs.filter((glyph) => glyph.equippedSphereId === sphereId);
@@ -322,7 +352,7 @@ export const equipGlyph = (state: AppState, glyphId: string, sphereId: string) =
     ? state.spheres.find((item) => item.id === glyph.equippedSphereId)
     : null;
 
-  sphere.glyphSlotCount = Math.max(sphere.glyphSlotCount, glyphSlotsForLevel(sphere.level));
+  recalculateSphereProgression(sphere);
   const isAlreadyEquippedHere = sphere.equippedGlyphIds.includes(glyph.id);
   if (!isAlreadyEquippedHere && sphere.equippedGlyphIds.length >= sphere.glyphSlotCount) {
     return false;
@@ -594,20 +624,18 @@ export const createDomainSphere = (
     dailyTargetMinutes,
     activeRitualId: ritualId,
     ritualIds: [ritualId],
-    glyphSlotCount: 1,
+    glyphSlotCount: 0,
     equippedGlyphIds: [],
-    glyphSlots: [
-      {
-        id: `${sphereId}_glyph_slot_1`,
-        sphereId,
-        index: 0,
-        unlocked: true,
-        glyphId: null,
-        source: "base",
-        createdAt: now,
-        updatedAt: now,
-      },
-    ],
+    glyphSlots: Array.from({ length: 3 }, (_, index) => ({
+      id: `${sphereId}_glyph_slot_${index + 1}`,
+      sphereId,
+      index,
+      unlocked: false,
+      glyphId: null,
+      source: "sphere-upgrade" as const,
+      createdAt: now,
+      updatedAt: now,
+    })),
     level: 1,
     xp: 0,
     spherePointsEarned: 0,

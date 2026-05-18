@@ -31,6 +31,7 @@ import {
   startSession,
   toggleConnection,
   unequipGlyph,
+  unlockGlyphSlot,
   updateDomainSphere,
   updateRitual,
 } from "./game.ts";
@@ -402,7 +403,10 @@ describe("core game calculations", () => {
     const state = createInitialState();
     const sphere = createDomainSphere(state, "Study", "#38bdf8", 20)!;
 
-    expect(sphere.glyphSlotCount).toBe(1);
+    expect(sphere.glyphSlotCount).toBe(0);
+    sphere.glyphSlots[0]!.unlocked = true;
+    sphere.glyphSlots[0]!.source = "base";
+    sphere.glyphSlotCount = 1;
     expect(equipGlyph(state, "glyph_streak", sphere.id)).toBe(true);
     expect(equippedGlyphsForSphere(state, sphere.id).map((glyph) => glyph.effect)).toEqual([
       "streak",
@@ -421,6 +425,8 @@ describe("core game calculations", () => {
       startedAt: "2026-05-08T11:59:00.000Z",
     };
     finishActiveSession(state);
+    sphere.glyphSlots[1]!.unlocked = true;
+    sphere.glyphSlots[1]!.source = "base";
     sphere.glyphSlotCount = 2;
     expect(equipGlyph(state, "glyph_deep_work", sphere.id)).toBe(true);
     expect(unequipGlyph(state, "glyph_streak")).toBe(true);
@@ -445,6 +451,10 @@ describe("core game calculations", () => {
     state.game.energy = 100;
     const source = createDomainSphere(state, "Study", "#38bdf8", 20)!;
     const target = createDomainSphere(state, "Move", "#f97316", 20)!;
+    source.xp = 15;
+    target.xp = 15;
+    expect(unlockGlyphSlot(state, source.id)).toBe(true);
+    expect(unlockGlyphSlot(state, target.id)).toBe(true);
 
     expect(equipGlyph(state, "glyph_streak", source.id)).toBe(true);
     expect(equipGlyph(state, "glyph_deep_work", target.id)).toBe(true);
@@ -465,8 +475,10 @@ describe("core game calculations", () => {
     expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
     expect(spendSpherePoint(state, sphere.id, "Flow")).toBe(true);
     expect(spendSpherePoint(state, sphere.id, "Bloom")).toBe(true);
-    expect(equipGlyph(state, "glyph_amplify", sphere.id)).toBe(true);
+    sphere.glyphSlots[0]!.unlocked = true;
+    sphere.glyphSlots[1]!.unlocked = true;
     sphere.glyphSlotCount = 2;
+    expect(equipGlyph(state, "glyph_amplify", sphere.id)).toBe(true);
     expect(equipGlyph(state, "glyph_store", sphere.id)).toBe(true);
 
     const resolution = resolveProgressionModifiers(state, { sphereId: sphere.id });
@@ -580,6 +592,9 @@ describe("core game calculations", () => {
     ).toBeCloseTo(2.2);
 
     source.charge = 80;
+    source.glyphSlots[0]!.unlocked = true;
+    source.glyphSlots[0]!.source = "base";
+    source.glyphSlotCount = 1;
     expect(equipGlyph(state, "glyph_release", source.id)).toBe(true);
     setNow("2026-05-08T12:10:00.000Z");
     state.activeSession = {
@@ -834,7 +849,7 @@ describe("core game calculations", () => {
     expect(restoredSphere.spherePointsSpent).toBe(1);
     expect(restoredSphere.availablePoints).toBe(1);
     expect(restoredSphere.upgradePurchases).toEqual([]);
-    expect(restoredSphere.glyphSlots).toHaveLength(1);
+    expect(restoredSphere.glyphSlots).toHaveLength(3);
     expect(restoredConnection.enabled).toBe(true);
     expect(restoredConnection.allocationPercent).toBe(100);
     expect(restoredConnection.level).toBe(1);

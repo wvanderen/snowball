@@ -1740,11 +1740,27 @@ input[type="color"] {
 
 .lattice-actions,
 .equipped-glyphs,
+.glyph-slots,
 .settings-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   align-items: center;
+}
+
+.glyph-slot {
+  border: 1px solid color-mix(in srgb, var(--sphere-color), transparent 58%);
+  border-radius: 999px;
+  padding: 0.35rem 0.6rem;
+  color: var(--ink-1);
+  background: color-mix(in srgb, var(--sphere-color), transparent 90%);
+  font-size: 0.75rem;
+}
+
+.glyph-slot.is-locked {
+  border-style: dashed;
+  color: var(--ink-3);
+  background: oklch(100% 0 0 / 0.03);
 }
 
 .settings-panel {
@@ -1990,7 +2006,8 @@ input[type="color"] {
 .path-grid,
 .lattice-actions,
 .lattice-section label,
-.equipped-glyphs {
+.equipped-glyphs,
+.glyph-slots {
   position: relative;
   z-index: 1;
 }

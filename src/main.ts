@@ -25,6 +25,7 @@ import {
   formatDuration,
   formatMinutes,
   getRitual,
+  nextGlyphSlotRequirement,
   outgoingConnectionsForSphere,
   reverseConnection,
   routeConnectionToSphere,
@@ -44,6 +45,7 @@ import {
   toggleConnection,
   startSession,
   unequipGlyph,
+  unlockGlyphSlot,
   updateDomainSphere,
   updateRitual,
 } from "./game.ts";
@@ -356,6 +358,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
   const routeConnections = outgoingConnectionsForSphere(state, sphere.id);
   const equippedGlyphs = equippedGlyphsForSphere(state, sphere.id);
   const availableGlyphs = state.glyphs.filter((glyph) => !glyph.equippedSphereId);
+  const nextGlyphSlot = nextGlyphSlotRequirement(sphere);
   const routeOptions = [
     { id: centerSphereId, name: "Center" },
     ...activeDomainSpheres()
@@ -381,7 +384,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
             })
             .join("")
         : latticePanel === "glyphs"
-          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots unlock at levels 1, 4, and 7. Equipped mods alter the formulas below immediately.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
+          ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots are per-node investments. Spend Sphere Points to unlock slots at levels 1, 4, and 7.</p></div><div class="glyph-slots">${sphere.glyphSlots.map((slot) => `<span class="glyph-slot ${slot.unlocked ? "is-unlocked" : "is-locked"}">${slot.unlocked ? (slot.glyphId ? "Filled" : "Open") : `Locked L${1 + slot.index * 3}`}</span>`).join("")}</div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<button class="quiet" data-action="unlock-glyph-slot" data-sphere-id="${sphere.id}" ${nextGlyphSlot && sphere.level >= nextGlyphSlot.level && sphere.availablePoints >= nextGlyphSlot.pointCost ? "" : "disabled"}>${nextGlyphSlot ? `Unlock slot ${nextGlyphSlot.index + 1} · ${nextGlyphSlot.pointCost} pt` : "All slots unlocked"}</button><label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
           : renderProgressionPanel(sphere);
   return `<div class="sphere-layer sphere-game-layer">
     <section class="lattice-summary" aria-label="Game effect for ${sphere.name}">
@@ -729,6 +732,12 @@ app.addEventListener("click", async (event) => {
   if (action === "unequip-glyph") {
     const glyphId = actionElement.dataset.glyphId;
     if (glyphId && unequipGlyph(state, glyphId)) lastReward = "Mod removed";
+    persistState();
+    render();
+  }
+  if (action === "unlock-glyph-slot") {
+    const sphereId = actionElement.dataset.sphereId;
+    if (sphereId && unlockGlyphSlot(state, sphereId)) lastReward = "Mod slot unlocked";
     persistState();
     render();
   }

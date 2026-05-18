@@ -216,13 +216,13 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null;
 
 const defaultGlyphSlots = (sphere: Sphere, now: string) =>
-  Array.from({ length: sphere.glyphSlotCount }, (_, index) => ({
+  Array.from({ length: 3 }, (_, index) => ({
     id: `${sphere.id}_glyph_slot_${index + 1}`,
     sphereId: sphere.id,
     index,
-    unlocked: true,
-    glyphId: sphere.equippedGlyphIds[index] ?? null,
-    source: index === 0 ? "base" : "sphere-upgrade",
+    unlocked: index < sphere.glyphSlotCount,
+    glyphId: index < sphere.glyphSlotCount ? (sphere.equippedGlyphIds[index] ?? null) : null,
+    source: index === 0 && sphere.glyphSlotCount > 0 ? "base" : "sphere-upgrade",
     createdAt: sphere.createdAt ?? now,
     updatedAt: sphere.updatedAt ?? now,
   })) satisfies Sphere["glyphSlots"];

@@ -114,7 +114,7 @@ Domain Sphere -> Center Sphere
 
 Later it grows to roughly 6-10 domain spheres around the Center.
 
-Connections are directed and can be active/inactive. Eventually, the user can route energy and choose strategic roles for nodes.
+Connections are directed and can be active/inactive. The current routing UI lets users retarget routes, pause/run them, swap non-Center direction, and set outgoing allocation percentages that normalize to 100%.
 
 ## Sphere roles: future design space
 
@@ -129,7 +129,7 @@ Spheres may become specialized through glyphs/upgrades:
 
 ## Glyphs
 
-Glyphs are sphere-slotted modifiers that create build variety.
+Glyphs are sphere-slotted modifiers that create build variety. Domain spheres earn slots at levels 1, 4, and 7 for 1 Sphere Point each. Unlocking the first slot triggers a guaranteed choose-one-of-three glyph reward; later Glyph Forge rolls cost `floor(75 × 1.85^forgeCount)` Energy and reveal three choices.
 
 Potential glyph design axes:
 
@@ -193,5 +193,5 @@ Risky progression:
 - How should sphere slot costs scale?
 - What is the first compelling non-streak glyph build?
 - Should Sphere Points alone buy permanent identity nodes, or should stronger nodes also require Energy?
-- How steep should the Glyph Forge cost curve be?
-- Should the first glyph arrive from a milestone choice, a Core Power unlock, or a Forge purchase?
+- How quickly should advanced Glyph Forge rarity tiers enter?
+- Should stronger sphere identity nodes add Energy gates, or remain Sphere Point only?

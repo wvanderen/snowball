@@ -142,11 +142,13 @@ Adding a sphere should feel like a major progression moment and a meaningful lif
 
 Goal: turn the lattice into a strategic playground.
 
+Status: core controls shipped; connection upgrades deferred.
+
 Features:
 
 - toggle connections active/inactive
-- set connection direction
-- set per-edge Energy allocation for outgoing routes
+- retarget directed connections and swap non-Center routes
+- set per-edge Energy allocation for outgoing routes; enabled routes normalize to 100%
 - energy flow visualization per edge
 - simple connected-sphere buffs
 - center as output node
@@ -163,14 +165,17 @@ Possible mechanics:
 
 Goal: introduce build variety and make different consistency styles viable.
 
+Status: first inventory/socket/forge slice shipped. Rarity tiers, fusion, and advanced pools deferred.
+
 Features:
 
 - glyph inventory
-- glyph slots on spheres as power-scaling upgrades
+- glyph slots on spheres as power-scaling upgrades at levels 1/4/7, costing 1 Sphere Point each
 - equip/unequip glyphs
 - first set of basic glyphs
-- Glyph Forge or milestone-choice acquisition
-- escalating Energy cost for glyph rolls/rewards
+- first-slot guaranteed choose-one-of-three reward
+- Glyph Forge acquisition with three choices
+- escalating Energy cost for glyph rolls/rewards: `floor(75 × 1.85^forgeCount)`
 - glyph effects based on existing stats
 
 Initial glyph candidates:

@@ -9,7 +9,7 @@
 
 ## Current implementation status
 
-Implemented v0 prototype foundation:
+Implemented prototype foundation plus progression v0.2 slices:
 
 - first sphere creation
 - default ritual creation
@@ -17,10 +17,15 @@ Implemented v0 prototype foundation:
 - tap-to-start session
 - countdown timer for targeted ritual
 - session logging
-- XP/energy/momentum updates
+- per-sphere XP/energy/momentum updates
+- sphere level curve and Sphere Points
+- Core Power purchase at Center
+- sphere path upgrades and glyph slots
 - daily milestone progress
 - passive production while away
-- localStorage persistence
+- controllable route connections and allocations
+- glyph inventory, socketing, first reward, and forge choices
+- localStorage/IndexedDB-backed persistence
 
 ## Domain entities
 
@@ -53,6 +58,11 @@ Important fields:
 - active ritual id
 - ritual ids
 - level
+- xp
+- Sphere Points earned/spent/available
+- path allocations and upgrade purchases
+- glyph slot count, equipped glyph ids, and glyph slots
+- charge
 - momentum
 - streak stats
 - total/today seconds
@@ -97,7 +107,11 @@ Important fields:
 - stable id
 - from sphere
 - to sphere
-- active flag
+- active/enabled flags
+- allocation percent
+- level and throughput multiplier
+- routing loss
+- mode
 - timestamps
 
 ### GameState
@@ -108,8 +122,10 @@ Important fields:
 
 - current energy
 - lifetime energy
-- current XP
-- lifetime XP
+- legacy current XP/lifetime XP fields for compatibility; progression uses per-sphere XP
+- Core Power level and purchases
+- glyph forge count
+- first glyph reward claimed flag
 - last passive tick timestamp
 
 ## Local-first, sync-ready principles

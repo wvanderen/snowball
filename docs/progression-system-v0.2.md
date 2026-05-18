@@ -81,6 +81,8 @@ Sphere levels grant a sphere-specific progression currency, currently called **S
 Sphere XP -> Sphere Level -> Sphere Points -> permanent sphere upgrades
 ```
 
+Current shipped level thresholds are total XP: 0, 15, 45, 100, 180, 300, 475, 725, 1050, and 1500. Level 1 starts at 0 XP; each level after 1 grants 1 Sphere Point.
+
 Sphere Points are local to the sphere that earned them.
 
 ```txt
@@ -296,7 +298,7 @@ This allows both real-world effort and game-system engagement to matter.
 
 ## 5. Core Power menu
 
-Core Power is purchased at the Center with Energy.
+Core Power is purchased at the Center with Energy. The shipped foundation cost is `floor(120 × currentCorePowerLevel^1.65)`. Each purchased Core Power level currently increases the Center rest/recovery multiplier by +0.05 via `1 + (Core Power - 1) × 0.05`; richer upgrade-tree choices are deferred.
 
 Core Power upgrades are global and should be expensive enough to feel like major milestones.
 
@@ -585,14 +587,14 @@ Milestone completions now pulse Energy through connected spheres.
 
 ---
 
-## 9. Current open questions
+## 9. Implemented v0.2 decisions
 
-1. Should the first glyph reward happen at the first sphere slot unlock, at a Core Power milestone, or after the first major sphere milestone?
-2. Should glyph forge cost scale globally, per rarity tier, or both?
-3. Should Sphere Points alone buy identity nodes, or should stronger identity nodes also require Energy?
-4. Should every sphere start with one glyph slot, or should the first slot be earned through early sphere investment?
-5. How soon should manual routing percentages appear? Immediately, or after Core Power unlocks routing control?
-6. Should Momentum-based XP bonuses be rare glyph/upgrades only, or part of a normal late-game branch?
+1. The first glyph reward happens when the first domain glyph slot is unlocked. It reveals a guaranteed choose-one-of-three set and auto-sockets the choice into the first eligible open slot.
+2. Glyph Forge cost currently scales globally by forge count: `floor(75 × 1.85^forgeCount)`. Per-rarity cost curves are deferred.
+3. Sphere identity nodes currently cost Sphere Points only. Energy-gated stronger nodes remain future design space.
+4. Domain spheres start with zero unlocked glyph slots. Slots are earned per sphere at levels 1, 4, and 7, each costing 1 Sphere Point.
+5. Manual routing controls are available as soon as a sphere has a connection. Outgoing active routes normalize allocation percentages to 100%; domain-to-domain routes carry 5% loss while routes to Center have no loss.
+6. Momentum-based XP bonuses are deferred. v0.2 keeps XP grounded at one focused minute = one Sphere XP. Momentum affects Energy and recovery-oriented glyph/upgrades instead.
 
 ---
 
@@ -603,10 +605,14 @@ The domain model should move toward:
 ```ts
 type GameState = {
   energy: number;
+  lifetimeEnergy: number;
+  experience: number; // legacy/global display compatibility; global XP is retired for progression
+  lifetimeExperience: number;
   corePowerLevel: number;
   coreUpgrades: CoreUpgradePurchase[];
   glyphForgeCount: number;
-  glyphInventory: GlyphInstance[];
+  firstGlyphRewardClaimed: boolean;
+  lastPassiveTickAt: string;
 };
 ```
 
@@ -621,6 +627,8 @@ type Sphere = {
   upgradePurchases: SphereUpgradePurchase[];
   momentum: number;
   charge: number;
+  glyphSlotCount: number;
+  equippedGlyphIds: string[];
   glyphSlots: GlyphSlot[];
 };
 ```
@@ -630,9 +638,12 @@ type Connection = {
   id: string;
   fromSphereId: string;
   toSphereId: string;
+  active: boolean;
   enabled: boolean;
   allocationPercent: number;
   level: number;
+  throughputMultiplier: number;
+  routingLoss: number;
   mode: ConnectionMode;
 };
 ```

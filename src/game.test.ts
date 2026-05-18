@@ -18,6 +18,7 @@ import {
   finishActiveSession,
   purchaseCorePower,
   recentSessionsForRitual,
+  outgoingConnectionsForSphere,
   reverseConnection,
   resolveProgressionModifiers,
   routedSphereRates,
@@ -270,6 +271,49 @@ describe("core game calculations", () => {
     expect(reverseConnection(state, connection.id)).toBe(true);
     expect(connection.fromSphereId).toBe(second.id);
     expect(connection.toSphereId).toBe(first.id);
+  });
+
+  it("routes from the requested sphere instead of mutating an incoming route", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 1000;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    state.game.energy = 1000;
+    const third = createDomainSphere(state, "Study", "#38bdf8", 25)!;
+
+    expect(routeConnectionToSphere(state, first.id, second.id)).toBe(true);
+    expect(routeConnectionToSphere(state, second.id, third.id)).toBe(true);
+
+    expect(outgoingConnectionsForSphere(state, first.id)[0]!.toSphereId).toBe(second.id);
+    expect(outgoingConnectionsForSphere(state, second.id)[0]!.toSphereId).toBe(third.id);
+  });
+
+  it("normalizes both old and new sources when reversing route allocations", () => {
+    const state = createInitialState();
+    const first = createDomainSphere(state, "Health", "#22c55e", 30)!;
+    state.game.energy = 1000;
+    const second = createDomainSphere(state, "Music", "#7dd3fc", 20)!;
+    state.game.energy = 1000;
+    const third = createDomainSphere(state, "Study", "#38bdf8", 25)!;
+    routeConnectionToSphere(state, first.id, second.id);
+    const firstRoute = outgoingConnectionsForSphere(state, first.id)[0]!;
+    state.connections.push({
+      ...firstRoute,
+      id: "connection_extra_reverse",
+      toSphereId: third.id,
+      allocationPercent: 50,
+    });
+    expect(setConnectionAllocation(state, firstRoute.id, 50)).toBe(true);
+
+    expect(reverseConnection(state, firstRoute.id)).toBe(true);
+
+    expect(outgoingConnectionsForSphere(state, first.id)[0]!.allocationPercent).toBe(100);
+    expect(
+      outgoingConnectionsForSphere(state, second.id).reduce(
+        (sum, connection) => sum + connection.allocationPercent,
+        0,
+      ),
+    ).toBe(100);
   });
 
   it("normalizes enabled route allocations and scales active route buffs", () => {

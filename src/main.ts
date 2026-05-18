@@ -25,7 +25,7 @@ import {
   formatDuration,
   formatMinutes,
   getRitual,
-  connectionForSphere,
+  outgoingConnectionsForSphere,
   reverseConnection,
   routeConnectionToSphere,
   routedSphereRates,
@@ -352,10 +352,7 @@ const renderSphereGameLayer = (sphere: Sphere) => {
     sphere.kind === "domain"
       ? routedSphereRates(state, sphere)
       : { activePerMinute: centerRecoveryMultiplier(state), passivePerHour: 0 };
-  const connection = connectionForSphere(state, sphere.id);
-  const routedTo = connection
-    ? state.spheres.find((item) => item.id === connection.toSphereId)?.name
-    : null;
+  const routeConnections = outgoingConnectionsForSphere(state, sphere.id);
   const equippedGlyphs = equippedGlyphsForSphere(state, sphere.id);
   const availableGlyphs = state.glyphs.filter((glyph) => !glyph.equippedSphereId);
   const routeOptions = [
@@ -373,8 +370,15 @@ const renderSphereGameLayer = (sphere: Sphere) => {
   const activePanel =
     sphere.kind === "center"
       ? `<section class="lattice-section"><div class="lattice-section-copy"><span>Center · Core Power ${state.game.corePowerLevel}</span><p>${centerUpgradeCopy()}</p><small>${round(state.game.energy)} / ${round(coreProgress.cost)} Energy · ${Math.round(coreProgress.percent)}% ready</small></div><button class="upgrade-action" data-action="buy-core-power" ${canAffordCorePower ? "" : "disabled"}>Core Power ${state.game.corePowerLevel + 1} · ${round(coreProgress.cost)}</button></section>`
-      : latticePanel === "route" && connection
-        ? `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"} at ${connection.allocationPercent}%. Active route boost scales by allocation, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Enabled outgoing routes normalize to 100%.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><label>Share<input type="number" min="0" max="100" step="5" value="${connection.allocationPercent}" data-action="set-connection-allocation" data-connection-id="${connection.id}" /></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`
+      : latticePanel === "route" && routeConnections.length > 0
+        ? routeConnections
+            .map((connection) => {
+              const routedTo = state.spheres.find(
+                (item) => item.id === connection.toSphereId,
+              )?.name;
+              return `<section class="lattice-section route-row"><div class="lattice-section-copy"><span>Route</span><p>${connection.active ? `To ${routedTo ?? "node"} at ${connection.allocationPercent}%. Active route boost scales by allocation, then applies route loss.` : "Paused, no route boost."}</p><small>Formula: target multiplier = 1.25 + Flow active bonus + Resonance bonus, minus 5% route loss unless target is Center. Enabled outgoing routes normalize to 100%.</small></div><label>Target<select data-action="route-connection" data-sphere-id="${sphere.id}">${routeOptions.map((option) => `<option value="${option.id}" ${option.id === connection.toSphereId ? "selected" : ""}>${option.name}</option>`).join("")}</select></label><label>Share<input type="number" min="0" max="100" step="5" value="${connection.allocationPercent}" data-action="set-connection-allocation" data-connection-id="${connection.id}" /></label><div class="lattice-actions"><button class="quiet" data-action="toggle-connection" data-connection-id="${connection.id}">${connection.active ? "Pause" : "Run"}</button><button class="quiet" data-action="reverse-connection" data-connection-id="${connection.id}" ${connection.fromSphereId === centerSphereId || connection.toSphereId === centerSphereId ? "disabled" : ""}>Swap</button></div></section>`;
+            })
+            .join("")
         : latticePanel === "glyphs"
           ? `<section class="lattice-section glyph-row"><div class="lattice-section-copy"><span>Mods ${equippedGlyphs.length}/${sphere.glyphSlotCount}</span><p>Slots unlock at levels 1, 4, and 7. Equipped mods alter the formulas below immediately.</p></div>${equippedGlyphs.length > 0 ? `<div class="equipped-glyphs">${equippedGlyphs.map((glyph) => `<button class="glyph-chip" title="${glyph.description}" data-action="unequip-glyph" data-glyph-id="${glyph.id}">${glyph.name} ×</button>`).join("")}</div>` : ""}<label>Add<select data-action="equip-glyph" data-sphere-id="${sphere.id}" ${availableGlyphs.length === 0 || equippedGlyphs.length >= sphere.glyphSlotCount ? "disabled" : ""}><option value="">Choose</option>${availableGlyphs.map((glyph) => `<option value="${glyph.id}">${glyph.name}: ${glyph.description}</option>`).join("")}</select></label></section>`
           : renderProgressionPanel(sphere);

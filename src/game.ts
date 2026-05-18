@@ -661,6 +661,9 @@ export const connectionForSphere = (state: AppState, sphereId: string) =>
     (connection) => connection.fromSphereId === sphereId || connection.toSphereId === sphereId,
   ) ?? null;
 
+export const outgoingConnectionForSphere = (state: AppState, sphereId: string) =>
+  outgoingConnectionsForSphere(state, sphereId)[0] ?? null;
+
 export const toggleConnection = (state: AppState, connectionId: string) => {
   const connection = state.connections.find((item) => item.id === connectionId);
   if (!connection) return false;
@@ -683,11 +686,13 @@ export const reverseConnection = (state: AppState, connectionId: string) => {
     return false;
   }
 
+  const previousFromSphereId = connection.fromSphereId;
   [connection.fromSphereId, connection.toSphereId] = [
     connection.toSphereId,
     connection.fromSphereId,
   ];
   connection.updatedAt = nowIso();
+  normalizeOutgoingAllocations(state, previousFromSphereId);
   normalizeOutgoingAllocations(state, connection.fromSphereId);
   return true;
 };
@@ -719,7 +724,7 @@ export const routeConnectionToSphere = (
   if (!sphere || !target) return false;
 
   const now = nowIso();
-  let connection = connectionForSphere(state, sphereId);
+  let connection = outgoingConnectionForSphere(state, sphereId);
   if (!connection) {
     connection = {
       id: createId("connection"),
